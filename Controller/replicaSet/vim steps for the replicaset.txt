@@ -1,0 +1,23 @@
+# Step 1: Create or update the ReplicaSet from the YAML definition file
+kubectl apply -f replicaset.yaml     # Applies the replicaset.yaml configuration to create the ReplicaSet
+
+# Step 2: Verify that the ReplicaSet has been created successfully
+kubectl get rs                      # Lists all ReplicaSets with desired, current, and ready replica counts
+
+# Step 3: Check the pods created by the ReplicaSet
+kubectl get pods -o wide             # Displays all pods with node, IP, and image details for better visibility
+
+# Step 4: Verify which image is used by a specific pod
+kubectl describe pod <pod-name> | grep Image   # Shows the container image used in the specified pod
+
+# Step 5: Edit the ReplicaSet configuration (for example, to update the container image)
+kubectl edit rs nginx-rs             # Opens the ReplicaSet definition in an editor for live modification
+
+# Step 6: Verify pods after editing the ReplicaSet
+kubectl get pods                     # Lists current pods to check if new pods are created after the update
+
+# Step 7: Force pods to restart and use the new image/configuration
+kubectl delete pod -l app=nginx-rs   # Deletes pods with label app=nginx-rs; the ReplicaSet will recreate them automatically
+
+# Step 8: Confirm the new pods are running correctly
+kubectl get pods -o wide             # Shows new pods and their updated configuration details
