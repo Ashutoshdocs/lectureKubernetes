@@ -1,0 +1,30 @@
+# The API version used for ReplicaSet resources.
+apiVersion: apps/v1
+
+# The resource type being defined — in this case, a ReplicaSet.
+kind: ReplicaSet
+
+# Metadata contains identifying information for the ReplicaSet.
+metadata:
+  name: nginx-rs             # Name of the ReplicaSet resource
+
+# Specification of the desired state of the ReplicaSet.
+spec:
+  replicas: 3                # Number of identical Pod replicas to maintain
+
+  # The selector defines which Pods this ReplicaSet is responsible for managing.
+  selector:
+    matchLabels:
+      app: nginx-rs          # The ReplicaSet will manage Pods with label 'app=nginx-rs'
+
+  # The Pod template used to create Pods when replicas are missing.
+  template:
+    metadata:
+      labels:
+        app: nginx-rs        # Label assigned to Pods created by this ReplicaSet (must match the selector above)
+    spec:
+      containers:
+      - name: nginx          # Name of the container running inside each Pod
+        image: nginx:1.14    # Container image to use (nginx version 1.14)
+        ports:
+        - containerPort: 80  # Port exposed by the container for serving web traffic
