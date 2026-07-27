@@ -1,0 +1,59 @@
+# Step 1: Create or update the Deployment from the YAML definition file
+kubectl apply -f deployment.yaml        # Applies the deployment configuration; creates Deployment, ReplicaSet, and Pods
+
+# Step 2: Verify Deployment creation
+kubectl get deployment                  # Lists all Deployments showing desired, current, and available replicas
+
+# Step 3: Check the ReplicaSet created by the Deployment
+kubectl get rs                          # Displays ReplicaSets managed by the Deployment (auto-created by Kubernetes)
+
+# Step 4: View all running Pods with additional details
+kubectl get pods -o wide                # Shows pods with IPs, node info, and image version for verification
+
+
+# Step 5: Update the container image of the Deployment
+kubectl set image deployment/nginx-deploy nginx=nginx:1.16   # Updates the nginx container image to version 1.16
+
+# Step 6: Monitor rollout progress of the Deployment update
+kubectl rollout status deployment/nginx-deploy               # Displays live status of the deployment rollout (upgrade process)
+
+# Step 7: Recheck ReplicaSets after the update
+kubectl get rs                          # Lists old and new ReplicaSets; the new one should have the updated image
+
+# Step 8: Verify new Pods and their configuration
+kubectl get pods -o wide                # Shows pods after update to confirm new image version and IPs
+
+# Step 9: Confirm which image version is running inside a specific Pod
+kubectl describe pod <pod-name> | grep Image   # Displays the container image being used by the specified pod
+
+
+# Step 10: Roll back the Deployment to the previous version if needed
+kubectl rollout undo deployment/nginx-deploy                 # Reverts to the last working version of the Deployment
+
+# Step 11: Check rollout status again after rollback
+kubectl rollout status deployment/nginx-deploy               # Verifies that the rollback is complete and Pods are running
+
+# Step 12: View rollout history of the Deployment
+kubectl rollout history deployment/nginx-deploy              # Shows previous rollout revisions for tracking changes
+
+# Step 13: Check ReplicaSets again after rollback
+kubectl get rs                          # Confirms which ReplicaSet is currently active after rollback
+
+
+# ─────────────────────────────────────────────────────────────
+# Visual Summary of the Deployment Lifecycle:
+# ─────────────────────────────────────────────────────────────
+
+# Initial:
+# Deployment ──▶ ReplicaSet v1 (nginx:1.14) ──▶ Pods (3x)
+#  - v1 ReplicaSet manages Pods using nginx:1.14
+
+# After Update:
+# Deployment ──▶ ReplicaSet v2 (nginx:1.16) ──▶ Pods (3x)
+#                ReplicaSet v1 (kept for rollback, scaled to 0)
+#  - v2 created automatically, v1 retained but inactive
+
+# After Rollback:
+# Deployment ──▶ ReplicaSet v1 (reactivated) ──▶ Pods (3x)
+#                ReplicaSet v2 (scaled to 0)
+#  - v1 reactivated with previous image, v2 scaled down
