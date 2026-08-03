@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-forbid
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+
+          containers:
+          - name: demo
+            image: busybox
+            command:
+            - sh
+            - -c
+            - |
+              echo "Started: $(date)"
+              sleep 120
+              echo "Finished: $(date)"

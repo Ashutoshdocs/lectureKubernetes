@@ -1,0 +1,2 @@
+kubectl create namespace cron-demo
+kubectl config set-context --current --namespace=cron-demo
