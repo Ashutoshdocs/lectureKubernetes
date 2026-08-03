@@ -1,0 +1,35 @@
+kubectl exec -it mysql-7d8b9f6c5f-abcde -- bash
+mysql -u root -p
+CREATE TABLE students (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100),
+    course VARCHAR(100),
+    city VARCHAR(100)
+);
+
+INSERT INTO students (name, course, city)
+VALUES ('Ashutosh', 'DevOps', 'Mumbai');
+
+INSERT INTO students (name, course, city)
+VALUES ('Rahul', 'AWS', 'Pune');
+
+INSERT INTO students (name, course, city)
+VALUES ('Priya', 'Azure', 'Bangalore');
+
+INSERT INTO students (name, course, city) VALUES
+('Karan', 'Kubernetes', 'Delhi'),
+('Sneha', 'Terraform', 'Hyderabad'),
+('Vikram', 'Docker', 'Chennai'),
+('Neha', 'Python', 'Kolkata'),
+('Amit', 'Ansible', 'Ahmedabad');
+
+INSERT INTO students (name, course, city) VALUES
+('Rohit', 'Jenkins', 'Nagpur'),
+('Pooja', 'Linux', 'Jaipur'),
+('Arjun', 'Git', 'Lucknow'),
+('Meera', 'Azure DevOps', 'Indore'),
+('Sanjay', 'AWS DevOps', 'Surat');
+
+ kubectl cp /home/azure/jobs_init/data/mysql-backups/studentdb-2026-06-18-0947.sql  mysql-5d74bd4687-24rms:/tmp/studentdb2.sql
+
+mysql -u root -pPass@12345 studentdb < /tmp/studentdb.sql

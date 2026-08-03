@@ -1,0 +1,9 @@
+kubectl apply -f blue.yaml
+kubectl apply -f service.yaml  # Points to blue
+
+# Now deploy green
+kubectl apply -f green.yaml
+
+# Switch traffic:
+kubectl patch svc web-svc -p '{"spec":{"selector":{"app":"web","version":"green"}}}'
+

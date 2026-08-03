@@ -1,0 +1,124 @@
+kubectl create namespace kyverno
+
+kubectl create -f https://github.com/kyverno/kyverno/releases/latest/download/install.yaml
+
+
+
+#mandatory.yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-team-label
+
+spec:
+  validationFailureAction: Enforce
+
+  rules:
+  - name: check-team-label
+
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+
+    validate:
+      message: "team label is required"
+
+      pattern:
+        metadata:
+          labels:
+            team: "?*"
+
+#badpod.yaml
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: badpod
+
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+
+
+
+#sucesspod.yaml
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: goodpod
+
+  labels:
+    team: devops
+
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+
+
+#securitypolicy.yaml
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+
+metadata:
+  name: require-non-root
+
+spec:
+  validationFailureAction: Enforce
+
+  rules:
+  - name: validate-security-context
+
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+
+    validate:
+      message: "runAsNonRoot required"
+
+      pattern:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+
+
+#badsecurity.yaml
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: rootpod
+
+  labels:
+    team: devops
+
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+
+#goodsecurity.yaml
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: securepod
+
+  labels:
+    team: devops
+
+spec:
+
+  securityContext:
+    runAsNonRoot: true
+
+  containers:
+  - name: nginx
+    image: nginx

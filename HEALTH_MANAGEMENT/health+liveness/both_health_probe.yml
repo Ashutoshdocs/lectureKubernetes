@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: both-probes-pod
+  namespace: canary-demo
+  labels:
+    app: both
+spec:
+  containers:
+  - name: app
+    image: nginx
+    ports:
+    - containerPort: 80
+
+    # ✅ LIVENESS PROBE
+    livenessProbe:
+      exec:
+        command:
+        - sh
+        - -c
+        - cat /tmp/live
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+    # ✅ READINESS PROBE
+    readinessProbe:
+      exec:
+        command:
+        - sh
+        - -c
+        - cat /tmp/ready
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+    lifecycle:
+      postStart:
+        exec:
+          command:
+          - sh
+          - -c
+          - |
+            echo live > /tmp/live
+            echo ready > /tmp/ready
+            echo "Hello from BOTH probes pod" > /usr/share/nginx/html/index.html
+

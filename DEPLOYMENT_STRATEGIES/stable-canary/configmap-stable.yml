@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stable-html
+data:
+  index.html: |
+    <html>
+    <body style="background:lightblue; font-size:40px; text-align:center">
+      <h1>I AM STABLE VERSION</h1>
+    </body>
+    </html>

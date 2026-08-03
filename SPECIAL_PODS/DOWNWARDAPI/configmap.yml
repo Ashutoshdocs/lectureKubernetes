@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-code
+
+data:
+  app.py: |
+    from flask import Flask, request
+    import os
+    import random
+    import sys
+    from datetime import datetime
+
+    app = Flask(__name__)
+
+    @app.route('/')
+    def home():
+
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Customer Portal</title>
+        </head>
+        <body>
+
+            <h1>Customer Portal</h1>
+
+            <form action="/submit" method="post">
+
+                Enter Name:
+                <input type="text" name="username" required>
+
+                <br><br>
+
+                <input type="submit" value="Submit">
+
+            </form>
+
+        </body>
+        </html>
+        '''
+
+    @app.route('/submit', methods=['POST'])
+    def submit():
+
+        username = request.form['username']
+
+        pod = os.getenv("POD_NAME", "UNKNOWN")
+        node = os.getenv("NODE_NAME", "UNKNOWN")
+
+        response_time = random.randint(1,20)
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        log = f"""
+    ==================================================
+    TIME={timestamp}
+    USER={username}
+    RESPONSE_TIME={response_time}s
+    POD={pod}
+    NODE={node}
+    ==================================================
+    """
+
+        print(log)
+        sys.stdout.flush()
+
+        return f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Request Submitted</title>
+        </head>
+        <body>
+
+            <h1>Hello {username}</h1>
+
+            <h2>Request Submitted Successfully</h2>
+
+        </body>
+        </html>
+        '''
+
+    app.run(host="0.0.0.0", port=5000)

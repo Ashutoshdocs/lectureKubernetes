@@ -1,0 +1,32 @@
+#labels for the nodes
+
+kubectl label node worker1 role=worker
+kubectl label node worker2 role=worker
+
+#lverify labels
+kubectl get nodes --show-labels
+
+
+#apiVersion: apps/v1
+kind: DaemonSet
+
+metadata:
+  name: monitoring-agent
+
+spec:
+  selector:
+    matchLabels:
+      app: monitor
+
+  template:
+    metadata:
+      labels:
+        app: monitor
+
+    spec:
+      nodeSelector:
+        role: worker
+
+      containers:
+      - name: monitor
+        image: nginx

@@ -1,0 +1,99 @@
+###############################################
+# 🧠 Mental Model
+###############################################
+# Readiness → controls traffic
+# Liveness  → controls restart
+
+
+###############################################
+# 1. Create Namespace
+###############################################
+kubectl create ns canary-demo
+
+
+###############################################
+# 2. Create resources (POD + Service)
+###############################################
+# Assumes YAMLs already exist in the directory
+kubectl apply -f both-probes-pod.yml
+kubectl apply -f both-probes-svc.yml
+
+
+###############################################
+# 3. Verify pod status
+###############################################
+kubectl get pod -n canary-demo
+
+# Expected:
+# both-probes-pod   1/1   Running   0
+
+
+###############################################
+# 4. Verify application works
+###############################################
+kubectl exec -n canary-demo both-probes-pod -- curl localhost
+
+# Output:
+# Hello from BOTH probes pod
+
+
+###############################################
+# 5. BREAK READINESS (traffic stops)
+###############################################
+kubectl exec -n canary-demo both-probes-pod -- rm /tmp/ready
+
+
+###############################################
+# 6. Watch pod status
+###############################################
+kubectl get pod -n canary-demo -w
+
+# Expected:
+# READY 0/1
+# RESTARTS 0
+
+
+###############################################
+# 7. Verify service endpoints removed
+###############################################
+kubectl get endpoints both-probes-service -n canary-demo
+
+# Expected:
+# <no endpoints>
+
+
+###############################################
+# 8. BREAK LIVENESS (container restarts)
+###############################################
+kubectl exec -n canary-demo both-probes-pod -- rm /tmp/live
+
+
+###############################################
+# 9. Watch pod restart
+###############################################
+kubectl get pod -n canary-demo -w
+
+# Expected:
+# RESTARTS increases to 1
+
+
+###############################################
+# 10. Verify recovery
+###############################################
+kubectl get pod -n canary-demo
+kubectl get endpoints both-probes-service -n canary-demo
+
+# Expected:
+# Pod back to 1/1
+# Endpoints restored
+
+
+###############################################
+# ✅ FINAL LEARNING
+###############################################
+# rm /tmp/ready → Traffic stops, NO restart
+# rm /tmp/live  → Container restarts
+# Readiness controls traffic
+# Liveness controls restart
+###############################################
+

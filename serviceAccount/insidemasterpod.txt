@@ -1,0 +1,10 @@
+cat <<EOF > /tmp/demo-pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: created-by-serviceaccount
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+EOF

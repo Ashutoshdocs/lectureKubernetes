@@ -1,0 +1,8 @@
+kubectl apply -f rolling.yaml
+kubectl rollout status deployment/rolling-demo
+
+# Update image
+kubectl set image deployment/rolling-demo demo=nginx:1.24
+
+# Check rollout
+kubectl rollout history deployment/rolling-demo

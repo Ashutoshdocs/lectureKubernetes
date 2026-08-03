@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-backup-job
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: mysql-backup
+        image: mysql:5.7
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Taking MySQL backup..."
+          mysqldump -h mysql -u root -pPass@12345 studentdb > /backup/studentdb-$(date +%F-%H%M).sql
+          echo "Backup Completed."
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /backup
+      volumes:
+      - name: backup-storage
+        hostPath:
+          path: /home/azure/jobs_init/data/mysql-backups
+          type: Directory
+

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: web
+        version: canary
+    spec:
+      containers:
+      - name: canary-nginx
+        image: nginx
+        volumeMounts:
+        - name: canary-html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: canary-html
+        configMap:
+          name: canary-html

@@ -1,0 +1,5 @@
+kubectl apply -f recreate.yaml
+
+kubectl set image deployment/recreate-demo demo=nginx:1.24
+kubectl get pods -w
+# Observe all old pods terminate before new ones come

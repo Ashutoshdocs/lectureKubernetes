@@ -1,0 +1,11 @@
+cd /etc/kubernetes/pki
+
+# Generate key
+openssl genrsa -out alice.key 2048
+
+# Create CSR
+openssl req -new -key alice.key -out alice.csr -subj "/CN=alice/O=dev"
+
+# Sign CSR with Kubernetes CA
+openssl x509 -req -in alice.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out alice.crt -days 365
+

@@ -1,0 +1,17 @@
+cd frontend
+docker build -t hallticket-frontend:v1 .
+
+cd ../sidecar
+docker build -t hallticket-sidecar:v1 .
+
+
+docker save hallticket-frontend:v1 -o frontend.tar
+docker save hallticket-sidecar:v1 -o sidecar.tar
+
+
+sudo ctr -n=k8s.io images import frontend.tar
+sudo ctr -n=k8s.io images import sidecar.tar
+sudo ctr -n=k8s.io images ls | grep hallticket
+
+sudo ctr -n=k8s.io images rm docker.io/library/hallticket-frontend:v1
+sudo ctr -n=k8s.io images rm docker.io/library/hallticket-sidecar:v1

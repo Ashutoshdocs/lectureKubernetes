@@ -1,0 +1,120 @@
+###############################################
+# 1. Create Namespace
+###############################################
+kubectl create ns canary-demo
+
+
+###############################################
+# 2. Apply Pods (pod-1.yaml and pod-2.yaml)
+###############################################
+kubectl apply -f pod-1.yaml -n canary-demo
+kubectl apply -f pod-2.yaml -n canary-demo
+
+
+###############################################
+# 3. Apply Service
+###############################################
+kubectl apply -f service.yaml -n canary-demo
+
+
+###############################################
+# 4. Verify Pods
+###############################################
+kubectl get pods -n canary-demo
+
+
+###############################################
+# 5. Verify Service
+###############################################
+kubectl get svc -n canary-demo
+
+
+###############################################
+# 6. Test Service
+###############################################
+curl http://<NodeIP>:<NodePort>
+
+
+###############################################
+# 7. BREAK pod-2 readiness
+###############################################
+kubectl exec -n canary-demo pod-2 -- rm /tmp/ready
+
+
+###############################################
+# 8. Check pod readiness state
+###############################################
+kubectl get pods -n canary-demo
+
+
+###############################################
+# 9. Curl again — should hit only pod-1
+###############################################
+curl http://<NodeIP>:<NodePort>
+
+
+###############################################
+# 10. BREAK pod-1 readiness
+###############################################
+kubectl exec -n canary-demo pod-1 -- rm /tmp/ready
+
+
+###############################################
+# 11. FIX pod-2 readiness
+###############################################
+kubectl exec -n canary-demo pod-2 -- sh -c "echo ready > /tmp/ready"
+
+
+###############################################
+# 12. Check pod readiness states
+###############################################
+kubectl get pods -n canary-demo
+
+
+###############################################
+# 13. Curl again — should hit only pod-2
+###############################################
+curl http://<NodeIP>:<NodePort>
+
+
+###############################################
+# 14. FIX pod-1 readiness
+###############################################
+kubectl exec -n canary-demo pod-1 -- sh -c "echo ready > /tmp/ready"
+
+
+
+###############################################
+# 15. Debug: curl inside pod-2
+###############################################
+kubectl exec -n canary-demo pod-2 -- curl localhost
+
+
+###############################################
+# 16. Inspect endpoints of the service
+###############################################
+kubectl get endpoints hello-service -n canary-demo -o wide
+
+
+###############################################
+# 17. View nginx index.html inside pod-2
+###############################################
+kubectl exec -n canary-demo pod-2 -- cat /usr/share/nginx/html/index.html
+
+
+###############################################
+# 18. BREAK pod-2 again (optional test)
+###############################################
+kubectl exec -n canary-demo pod-2 -- rm /tmp/ready
+
+
+###############################################
+# 19. Describe pod-2
+###############################################
+kubectl describe pod pod-2 -n canary-demo
+
+
+###############################################
+# 20. Exec into pod
+###############################################
+kubectl exec -it -n canary-demo pod-1 -- sh

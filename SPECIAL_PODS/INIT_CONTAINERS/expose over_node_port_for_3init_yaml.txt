@@ -1,0 +1,12 @@
+kubectl expose pod nginx-python-init-demo \
+  --type=NodePort \
+  --port=80 \
+  --target-port=80 \
+  --name=nginx-python-service
+
+
+kubectl expose pod nginx-python-init-demo \
+  --type=NodePort \
+  --port=5000 \
+  --target-port=5000 \
+  --name=flask-service

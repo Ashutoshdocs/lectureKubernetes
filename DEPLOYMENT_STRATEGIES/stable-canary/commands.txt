@@ -1,0 +1,27 @@
+kubectl apply -f configmap-stable.yml
+kubectl apply -f stable.yml
+
+kubectl apply -f service_for_canary_stable.yml
+
+kubectl apply -f configmap-canary.yml
+kubectl apply -f canary.yml
+
+kubectl scale deployment stable --replicas=8
+kubectl scale deployment canary --replicas=2
+
+kubectl get deploy
+
+# Test traffic
+curl http://<NODE-IP>:<NODEPORT>
+
+# Increase canary
+kubectl scale deployment stable --replicas=5
+kubectl scale deployment canary --replicas=5
+
+# Full promotion
+kubectl scale deployment stable --replicas=0
+kubectl scale deployment canary --replicas=10
+
+# Rollback if required
+kubectl scale deployment stable --replicas=10
+kubectl scale deployment canary --replicas=0

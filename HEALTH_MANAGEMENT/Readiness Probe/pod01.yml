@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  namespace: canary-demo
+  labels:
+    app: hello
+spec:
+  containers:
+  - name: app
+    image: nginx
+    ports:
+    - containerPort: 80
+    readinessProbe:
+      exec:
+        command:
+        - sh
+        - -c
+        - cat /tmp/ready
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    lifecycle:
+      postStart:
+        exec:
+          command:
+          - sh
+          - -c
+          - echo "ready" > /tmp/ready && echo "Hello from Pod-1" > /usr/share/nginx/html/index.html
+

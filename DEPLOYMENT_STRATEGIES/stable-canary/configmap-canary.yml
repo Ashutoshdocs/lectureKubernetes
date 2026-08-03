@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canary-html
+data:
+  index.html: |
+    <html>
+    <body style="background:khaki; font-size:40px; text-align:center">
+      <h1>I AM CANARY VERSION</h1>
+    </body>
+    </html>

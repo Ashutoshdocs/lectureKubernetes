@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stable
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+      version: stable
+  template:
+    metadata:
+      labels:
+        app: web
+        version: stable
+    spec:
+      containers:
+      - name: stable-nginx
+        image: nginx
+        volumeMounts:
+        - name: stable-html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: stable-html
+        configMap:
+          name: stable-html

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-pod
+  namespace: canary-demo
+spec:
+  containers:
+  - name: app
+    image: nginx
+    ports:
+    - containerPort: 80
+    livenessProbe:
+      exec:
+        command:
+        - sh
+        - -c
+        - cat /tmp/live
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    lifecycle:
+      postStart:
+        exec:
+          command:
+          - sh
+          - -c
+          - |
+            echo live > /tmp/live
+            echo "Hello from Liveness Pod" > /usr/share/nginx/html/index.html
+

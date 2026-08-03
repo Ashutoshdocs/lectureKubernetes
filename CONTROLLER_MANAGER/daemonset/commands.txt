@@ -1,0 +1,109 @@
+# Create DaemonSet
+
+kubectl apply -f daemonset.yml
+
+# Verify DaemonSet
+
+kubectl get daemonset
+
+# Check DaemonSet details
+
+kubectl describe daemonset nginx-daemonset
+
+# Check Pods and Nodes
+
+kubectl get pods -o wide
+
+# Check all nodes in cluster
+
+kubectl get nodes
+
+# Verify DaemonSet after new node joins cluster
+
+kubectl get daemonset
+
+# Check Pods running on each node
+
+kubectl get pods -o wide
+
+# Delete a DaemonSet pod
+
+kubectl delete pod <daemonset-pod-name>
+
+# Verify DaemonSet recreates pod automatically
+
+kubectl get pods -o wide
+
+# Check DaemonSet events and status
+
+kubectl describe daemonset nginx-daemonset
+
+# Update container image in DaemonSet
+
+kubectl set image daemonset/nginx-daemonset nginx=nginx:alpine
+
+# Monitor rollout status
+
+kubectl rollout status daemonset/nginx-daemonset
+
+# View rollout history
+
+kubectl rollout history daemonset/nginx-daemonset
+
+# Rollback to previous version
+
+kubectl rollout undo daemonset/nginx-daemonset
+
+# Verify updated image
+
+kubectl describe daemonset nginx-daemonset
+
+# Label worker nodes
+
+kubectl label node worker1 role=worker
+kubectl label node worker2 role=worker
+
+# Verify labels
+
+kubectl get nodes --show-labels
+
+# Cordon a node
+
+kubectl cordon worker1
+
+# Verify node scheduling status
+
+kubectl get nodes
+
+# Delete DaemonSet pod on cordoned node
+
+kubectl delete pod <daemonset-pod-name>
+
+# Verify DaemonSet recreates pod even on cordoned node
+
+kubectl get pods -o wide
+
+# Uncordon node
+
+kubectl uncordon worker1
+
+# Add taint to node
+
+kubectl taint node worker1 env=prod:NoSchedule
+
+# Verify taint
+
+kubectl describe node worker1
+
+# Remove taint
+
+kubectl taint node worker1 env-
+
+# Delete DaemonSet
+
+kubectl delete daemonset nginx-daemonset
+
+# Verify deletion
+
+kubectl get daemonset
+kubectl get pods
