@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-code
+  namespace: project
+
+data:
+  app.py: |
+    from flask import Flask,request
+    import mysql.connector
+
+    app = Flask(__name__)
+
+    def conn():
+        return mysql.connector.connect(
+            host="mysql-service",
+            user="root",
+            password="Pass@12345",
+            database="studentdb"
+        )
+
+    @app.route("/")
+    def home():
+
+        db = conn()
+        cur = db.cursor()
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(50),
+        location VARCHAR(50))
+        """)
+
+        db.commit()
+
+        cur.execute("SELECT * FROM users")
+        rows = cur.fetchall()
+
+        html = """
+        <h1>User Registration</h1>
+
+        <form method='post' action='/add'>
+        Name:<input name='name'><br><br>
+        Location:<input name='location'><br><br>
+        <input type='submit'>
+        </form>
+
+        <hr>
+        """
+
+        for row in rows:
+            html += f"{row}<br>"
+
+        return html
+
+    @app.route("/add", methods=["POST"])
+    def add():
+
+        name = request.form["name"]
+        location = request.form["location"]
+
+        db = conn()
+        cur = db.cursor()
+
+        cur.execute(
+            "INSERT INTO users(name,location) VALUES(%s,%s)",
+            (name,location)
+        )
+
+        db.commit()
+
+        return "<a href='/'>View Records</a>"
+
+    app.run(host="0.0.0.0",port=5000)

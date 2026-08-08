@@ -1,0 +1,41 @@
+step create infra:
+$RG="AKSIngressRG"
+$LOCATION="centralus"
+
+az group create --name $RG --location $LOCATION
+$AKSNAME="AKSIngressDemo"
+
+az aks create --resource-group $RG --name $AKSNAME --node-count 2 --node-vm-size Standard_B2s --generate-ssh-keys --network-plugin azure --enable-managed-identity
+az aks get-credentials --resource-group AKSIngressRG --name AKSIngressDemo --overwrite-existing
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+
+step :01
+run all the deployment and svc yamls.
+step02:
+kubectl run test --rm -it --image=busybox -- sh
+wget -qO- http://app1-service
+wget -qO- http://app2-service
+
+step 01:
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+step 02:
+put the dns record setup
+step 03:
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.crds.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+step04:
+run clusterissuer.yaml by replacing emailid
+
+kubectl get ingress
+kubectl get certificate
+kubectl get certificaterequest
+kubectl get challenge
+kubectl get order
+kubectl get secret
+kubectl get pods
+kubectl get svc
+
+
+https://akblazeacademy.net/app1
+https://akblazeacademy.net/app2

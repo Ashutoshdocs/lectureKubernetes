@@ -1,0 +1,16 @@
+$RG="AKSIngressRG"
+$LOCATION="centralus"
+
+az group create --name $RG --location $LOCATION
+$AKSNAME="AKSIngressDemo"
+
+az aks create --resource-group $RG --name $AKSNAME --node-count 2 --node-vm-size Standard_B2s --generate-ssh-keys --network-plugin azure --enable-managed-identity
+az aks get-credentials --resource-group AKSIngressRG --name AKSIngressDemo --overwrite-existing
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx
+az aks show --resource-group AKSIngressRG --name AKSIngressDemo --query nodeResourceGroup -o tsv
+
+$MC_RG = az aks show --resource-group AKSIngressRG --name AKSIngressDemo --query nodeResourceGroup -o tsv
+
+az resource list --resource-group $MC_RG --output table

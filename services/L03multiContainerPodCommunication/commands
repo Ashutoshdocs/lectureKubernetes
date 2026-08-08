@@ -1,0 +1,4 @@
+kubectl exec -it pod-a -c c01 -- /bin/bash
+apt update && apt install curl -y
+curl 192.168.219.69:8081
+curl pod-a-service:8081

@@ -1,0 +1,93 @@
+# ===========================
+# Deployment - Pod 1
+# ===========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo
+      pod: pod1
+  template:
+    metadata:
+      labels:
+        app: demo
+        pod: pod1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Service Port 80 took you to Pod Port 80" > /usr/share/nginx/html/index.html
+          nginx -g 'daemon off;'
+        ports:
+        - containerPort: 80
+
+---
+# ===========================
+# Deployment - Pod 2
+# ===========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo
+      pod: pod2
+  template:
+    metadata:
+      labels:
+        app: demo
+        pod: pod2
+    spec:
+      containers:
+      - name: python-server
+        image: python:3.12-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat <<EOF > /app.py
+          from http.server import BaseHTTPRequestHandler,HTTPServer
+
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header("Content-type","text/plain")
+                  self.end_headers()
+                  self.wfile.write(b"Service Port 5000 took you to Pod Port 5000\n")
+
+          HTTPServer(("0.0.0.0",5000),Handler).serve_forever()
+          EOF
+          python /app.py
+        ports:
+        - containerPort: 5000
+
+---
+# ===========================
+# Service (2 Ports)
+# ===========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-service
+spec:
+  selector:
+    app: demo
+  ports:
+  - name: web
+    port: 80
+    targetPort: 80
+
+  - name: api
+    port: 5000
+    targetPort: 5000

@@ -1,0 +1,92 @@
+# DEFAULT DENY
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: netpol-demo
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# POD A
+# Can send ONLY to Pod C
+# Cannot receive from anyone
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-a-policy
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-a
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress: []
+
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: pod-c
+
+---
+# POD B
+# Can send/receive to anyone
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-b-policy
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-b
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress:
+  - {}
+
+  egress:
+  - {}
+
+---
+# POD C
+# Can receive ONLY from Pod A and Pod B
+# Cannot send traffic anywhere
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-c-policy
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-c
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: pod-a
+    - podSelector:
+        matchLabels:
+          app: pod-b
+
+  egress: []

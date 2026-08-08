@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: project
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      labels:
+        app: frontend
+
+    spec:
+      containers:
+
+      - name: frontend
+
+        image: python:3.12-slim
+
+        command:
+        - sh
+        - -c
+        - |
+          pip install flask mysql-connector-python
+          python /app/app.py
+
+        ports:
+        - containerPort: 5000
+
+        volumeMounts:
+        - name: appcode
+          mountPath: /app
+
+      volumes:
+      - name: appcode
+        configMap:
+          name: web-code

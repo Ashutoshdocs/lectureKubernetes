@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-b-service
+spec:
+  selector:
+    app: pod-b
+
+  ports:
+
+  # c03
+  - name: c03-port
+    protocol: TCP
+    port: 8083
+    targetPort: 8083
+
+  # c04
+  - name: c04-port
+    protocol: TCP
+    port: 8084
+    targetPort: 8084
+
+  type: ClusterIP

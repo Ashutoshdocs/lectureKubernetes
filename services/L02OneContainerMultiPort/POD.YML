@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx
+  namespace: two-port-demo
+  labels:
+    app: web
+
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+
+    command: ["/bin/sh","-c"]
+
+    args:
+      - |
+        apt update && apt install -y procps;
+
+        mkdir -p /var/www/html/app1;
+        mkdir -p /var/www/html/app2;
+
+        echo "Hello from Port 8081" > /var/www/html/app1/index.html;
+        echo "Hello from Port 8082" > /var/www/html/app2/index.html;
+
+        cat >/etc/nginx/conf.d/default.conf <<EOF
+        server {
+            listen 8081;
+            location / {
+                root /var/www/html/app1;
+                index index.html;
+            }
+        }
+
+        server {
+            listen 8082;
+            location / {
+                root /var/www/html/app2;
+                index index.html;
+            }
+        }
+        EOF
+
+        nginx -g 'daemon off;'
+
+    ports:
+    - containerPort: 8081
+
+    - containerPort: 8082

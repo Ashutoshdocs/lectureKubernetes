@@ -1,0 +1,12 @@
+# create a namespace first:
+kubectl taint nodes master node-role.kubernetes.io/control-plane-
+kubectl create namespace netpol-demo
+kubectl apply -f pods.yml
+kubectl apply -f networkpolicy.yml
+kubectl get networkpolicy -n netpol-demo
+kubectl get pods -n netpol-demo -o wide
+kubectl exec -it -n netpol-demo pod-a -- bash
+kubectl exec -it -n netpol-demo pod-b -- bash
+kubectl exec -it -n netpol-demo pod-c -- bash
+apt update && apt install curl -y
+curl <podip>

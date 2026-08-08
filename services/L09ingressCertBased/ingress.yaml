@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-ingress
+
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+spec:
+
+  ingressClassName: nginx
+
+  tls:
+  - hosts:
+      - akblazeacademy.net
+    secretName: aks-demo-tls
+
+  rules:
+
+  - host: akblazeacademy.net
+
+    http:
+
+      paths:
+
+      - path: /app1
+        pathType: Prefix
+
+        backend:
+          service:
+            name: app1-service
+            port:
+              number: 80
+
+      - path: /app2
+        pathType: Prefix
+
+        backend:
+          service:
+            name: app2-service
+            port:
+              number: 80

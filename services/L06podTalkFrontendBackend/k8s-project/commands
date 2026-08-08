@@ -1,0 +1,7 @@
+kubectl apply -f namespace.yml
+kubectl apply -f mysql-secret.yml
+kubectl apply -f mysql-deployment.yml
+kubectl apply -f mysql-service.yml
+kubectl apply -f web-code.yml
+kubectl apply -f frontend-deployment.yml
+kubectl apply -f frontend-service.yml

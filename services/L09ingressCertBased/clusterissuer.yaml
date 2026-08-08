@@ -1,0 +1,46 @@
+# ClusterIssuer is a cluster-wide resource.
+# It tells cert-manager HOW and WHERE to obtain SSL certificates.
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+
+metadata:
+  # This is the name of the ClusterIssuer.
+  # This name MUST match the annotation in the Ingress.
+  name: letsencrypt-prod
+
+spec:
+
+  acme:
+
+    # Email address registered with Let's Encrypt.
+    # Used for expiry notifications and account registration.
+    email: admin@akblazeacademy.net
+
+    # Let's Encrypt Production Server
+    # Use the staging URL while testing to avoid rate limits.
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+    # Kubernetes Secret where cert-manager stores
+    # the ACME account private key.
+    #
+    # NOTE:
+    # This is NOT your website certificate.
+    # This stores the Let's Encrypt account credentials.
+    privateKeySecretRef:
+      name: letsencrypt-prod
+
+    # Challenge solver
+    #
+    # cert-manager proves ownership of your domain
+    # using an HTTP challenge.
+    solvers:
+
+    - http01:
+
+        ingress:
+
+          # Must match the Ingress Controller class.
+          # If using NGINX Ingress Controller,
+          # this value is nginx.
+          class: nginx

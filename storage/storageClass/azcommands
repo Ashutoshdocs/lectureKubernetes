@@ -1,0 +1,22 @@
+az disk create -g aks-demo-rg -n demoDisk --size-gb 4 --sku Standard_LRS
+
+az disk show -g aks-demo-rg -n demoDisk --query id -o tsv
+
+$env:KUBECONFIG="D:\credsaks\config"
+
+
+kubectl exec -it storage-demo -- bash
+cd /data
+
+echo AKBLAZE > demo.txt
+kubectl delete pod storage-demo
+kubectl apply -f pod.yaml
+cat /data/demo.txt
+
+kubectl delete pod storage-demo
+
+kubectl delete pvc azure-pvc
+
+kubectl delete pv azure-pv
+az disk delete -g aks-demo-rg -n demoDisk
+kubectl get storageclass

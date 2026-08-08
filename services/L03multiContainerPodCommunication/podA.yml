@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-a
+  labels:
+    app: pod-a
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: master
+
+  containers:
+
+  - name: c01
+    image: nginx
+    ports:
+    - containerPort: 8081
+    command: ["/bin/sh","-c"]
+    args:
+      - echo "THIS IS C01 ON POD-A" > /usr/share/nginx/html/index.html;
+        sed -i 's/80/8081/g' /etc/nginx/conf.d/default.conf;
+        nginx -g 'daemon off;'
+
+  - name: c02
+    image: nginx
+    ports:
+    - containerPort: 8082
+    command: ["/bin/sh","-c"]
+    args:
+      - echo "THIS IS C02 ON POD-A" > /usr/share/nginx/html/index.html;
+        sed -i 's/80/8082/g' /etc/nginx/conf.d/default.conf;
+        nginx -g 'daemon off;'
