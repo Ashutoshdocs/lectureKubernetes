@@ -9,77 +9,550 @@ data:
     import os
     import random
     import sys
+    import html
     from datetime import datetime
 
     app = Flask(__name__)
 
+
     @app.route('/')
     def home():
-
         return '''
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Customer Portal</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+            <style>
+                :root {
+                    --paper: #FBF8F1;
+                    --forest: #2E5A46;
+                    --forest-deep: #1C3A2C;
+                    --forest-bright: #4A8368;
+                    --ink: #20302A;
+                    --muted: #6B7A72;
+                    --brass: #CDA23F;
+                    --line: #EAE3D5;
+                }
+
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+
+                body {
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    background: var(--paper);
+                    color: var(--ink);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px;
+                    -webkit-font-smoothing: antialiased;
+                }
+
+                .portal {
+                    width: 100%;
+                    max-width: 940px;
+                    background: var(--paper);
+                    border: 1px solid var(--line);
+                    border-radius: 28px;
+                    overflow: hidden;
+                    display: grid;
+                    grid-template-columns: 1.05fr 1fr;
+                    box-shadow: 0 30px 80px -30px rgba(28,58,44,0.45);
+                }
+
+                /* ---------- welcome panel ---------- */
+                .welcome {
+                    position: relative;
+                    padding: 48px 44px;
+                    background: radial-gradient(120% 120% at 15% 10%, var(--forest-bright) 0%, var(--forest) 42%, var(--forest-deep) 100%);
+                    color: #EAF3ED;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    isolation: isolate;
+                }
+
+                .rings {
+                    position: absolute;
+                    top: -90px;
+                    right: -90px;
+                    width: 340px;
+                    height: 340px;
+                    z-index: -1;
+                }
+
+                .rings span {
+                    position: absolute;
+                    inset: 0;
+                    border: 1px solid rgba(234,243,237,0.28);
+                    border-radius: 50%;
+                    animation: breathe 7s ease-in-out infinite;
+                }
+
+                .rings span:nth-child(2) { inset: 40px; animation-delay: .6s; }
+                .rings span:nth-child(3) { inset: 84px; animation-delay: 1.2s; }
+                .rings span:nth-child(4) { inset: 132px; animation-delay: 1.8s; border-color: rgba(205,162,63,0.5); }
+
+                @keyframes breathe {
+                    0%, 100% { transform: scale(1); opacity: .5; }
+                    50% { transform: scale(1.06); opacity: .9; }
+                }
+
+                .eyebrow {
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 12px;
+                    letter-spacing: .22em;
+                    text-transform: uppercase;
+                    color: var(--brass);
+                    margin-bottom: auto;
+                    display: flex;
+                    align-items: center;
+                    gap: 9px;
+                }
+
+                .eyebrow::before {
+                    content: "";
+                    width: 22px;
+                    height: 1px;
+                    background: var(--brass);
+                }
+
+                .welcome h1 {
+                    font-family: 'Fraunces', Georgia, serif;
+                    font-weight: 500;
+                    font-size: clamp(30px, 4vw, 42px);
+                    line-height: 1.08;
+                    letter-spacing: -.01em;
+                    margin: 34px 0 16px;
+                    color: #FCFBF6;
+                }
+
+                .welcome h1 em { font-style: italic; color: var(--brass); }
+
+                .welcome > p {
+                    color: rgba(234,243,237,0.78);
+                    font-size: 15.5px;
+                    line-height: 1.6;
+                    max-width: 34ch;
+                }
+
+                .assurances { margin-top: 30px; display: flex; flex-direction: column; gap: 14px; }
+
+                .assurances li {
+                    list-style: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-size: 14px;
+                    color: rgba(234,243,237,0.9);
+                }
+
+                .assurances .tick {
+                    flex: none;
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
+                    background: rgba(234,243,237,0.12);
+                    border: 1px solid rgba(205,162,63,0.55);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--brass);
+                    font-size: 12px;
+                }
+
+                /* ---------- form panel ---------- */
+                .form-panel {
+                    padding: 48px 44px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                }
+
+                .mark {
+                    width: 52px;
+                    height: 52px;
+                    border-radius: 15px;
+                    background: linear-gradient(140deg, var(--forest-bright), var(--forest-deep));
+                    color: #FCFBF6;
+                    font-family: 'Fraunces', serif;
+                    font-weight: 600;
+                    font-size: 26px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 10px 22px -8px rgba(46,90,70,0.7);
+                    margin-bottom: 26px;
+                }
+
+                .label-top {
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 11px;
+                    letter-spacing: .18em;
+                    text-transform: uppercase;
+                    color: var(--muted);
+                    margin-bottom: 6px;
+                }
+
+                .form-panel h2 {
+                    font-family: 'Fraunces', serif;
+                    font-weight: 500;
+                    font-size: 25px;
+                    color: var(--ink);
+                    margin-bottom: 28px;
+                }
+
+                .field { margin-bottom: 22px; }
+
+                .field label {
+                    display: block;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    margin-bottom: 8px;
+                }
+
+                .field input, .field textarea {
+                    width: 100%;
+                    padding: 15px 16px;
+                    border: 1.5px solid var(--line);
+                    border-radius: 13px;
+                    font-size: 15px;
+                    font-family: inherit;
+                    color: var(--ink);
+                    background: #fff;
+                    outline: none;
+                    transition: border-color .2s, box-shadow .2s;
+                }
+
+                .field textarea {
+                    min-height: 108px;
+                    line-height: 1.5;
+                    resize: vertical;
+                }
+
+                .field input::placeholder, .field textarea::placeholder { color: #A9B2AC; }
+
+                .field input:focus, .field textarea:focus {
+                    border-color: var(--forest-bright);
+                    box-shadow: 0 0 0 4px rgba(74,131,104,0.14);
+                }
+
+                .submit {
+                    width: 100%;
+                    padding: 16px;
+                    border: none;
+                    cursor: pointer;
+                    border-radius: 13px;
+                    background: linear-gradient(135deg, var(--forest-bright), var(--forest));
+                    color: #FCFBF6;
+                    font-family: inherit;
+                    font-size: 15px;
+                    font-weight: 600;
+                    letter-spacing: .01em;
+                    box-shadow: 0 12px 24px -10px rgba(46,90,70,0.8);
+                    transition: transform .2s, filter .2s, box-shadow .2s;
+                }
+
+                .submit:hover {
+                    transform: translateY(-2px);
+                    filter: brightness(1.05);
+                    box-shadow: 0 18px 30px -12px rgba(46,90,70,0.85);
+                }
+
+                .submit:active { transform: translateY(0); }
+
+                .status {
+                    margin-top: 26px;
+                    padding-top: 20px;
+                    border-top: 1px solid var(--line);
+                    display: flex;
+                    align-items: center;
+                    gap: 9px;
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 12px;
+                    color: var(--muted);
+                    letter-spacing: .02em;
+                }
+
+                .dot {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: #3FA46A;
+                    animation: pulse 2.2s infinite;
+                }
+
+                @keyframes pulse {
+                    0% { box-shadow: 0 0 0 0 rgba(63,164,106,0.5); }
+                    70% { box-shadow: 0 0 0 7px rgba(63,164,106,0); }
+                    100% { box-shadow: 0 0 0 0 rgba(63,164,106,0); }
+                }
+
+                @media (max-width: 760px) {
+                    .portal { grid-template-columns: 1fr; max-width: 440px; }
+                    .welcome { padding: 40px 32px; }
+                    .form-panel { padding: 38px 32px; }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    * { animation: none !important; transition: none !important; }
+                }
+            </style>
         </head>
         <body>
-
-            <h1>Customer Portal</h1>
-
-            <form action="/submit" method="post">
-
-                Enter Name:
-                <input type="text" name="username" required>
-
-                <br><br>
-
-                <input type="submit" value="Submit">
-
-            </form>
-
+            <main class="portal">
+                <section class="welcome">
+                    <div class="rings"><span></span><span></span><span></span><span></span></div>
+                    <div class="eyebrow">Concierge Support</div>
+                    <h1>How can we <em>help</em> you today?</h1>
+                    <p>Leave your name and we'll take it from there. A real person picks up every request that comes through.</p>
+                    <ul class="assurances">
+                        <li><span class="tick">&#10003;</span> Looked after by real people</li>
+                        <li><span class="tick">&#10003;</span> Most requests answered within a day</li>
+                        <li><span class="tick">&#10003;</span> Your details stay private</li>
+                    </ul>
+                </section>
+                <section class="form-panel">
+                    <div class="mark">C</div>
+                    <div class="label-top">Customer Portal</div>
+                    <h2>Start a request</h2>
+                    <form action="/submit" method="post">
+                        <div class="field">
+                            <label for="username">Your name</label>
+                            <input type="text" id="username" name="username" placeholder="e.g. Jordan Rivera" required autofocus>
+                        </div>
+                        <div class="field">
+                            <label for="phone">Phone number</label>
+                            <input type="tel" id="phone" name="phone" placeholder="e.g. +1 555 012 3456" inputmode="tel" autocomplete="tel" required>
+                        </div>
+                        <div class="field">
+                            <label for="query">Tell us your query</label>
+                            <textarea id="query" name="query" placeholder="Describe what you need help with..." required></textarea>
+                        </div>
+                        <button type="submit" class="submit">Submit request</button>
+                    </form>
+                    <div class="status"><span class="dot"></span> Support portal online</div>
+                </section>
+            </main>
         </body>
         </html>
         '''
+
 
     @app.route('/submit', methods=['POST'])
     def submit():
 
         username = request.form['username']
+        phone = request.form.get('phone', '')
+        query = request.form.get('query', '')
+        safe_name = html.escape(username)
+        safe_phone = html.escape(phone)
+        safe_query = html.escape(query)
 
         pod = os.getenv("POD_NAME", "UNKNOWN")
         node = os.getenv("NODE_NAME", "UNKNOWN")
 
-        response_time = random.randint(1,20)
-
+        response_time = random.randint(1, 20)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         log = f"""
-    ==================================================
-    TIME={timestamp}
-    USER={username}
-    RESPONSE_TIME={response_time}s
-    POD={pod}
-    NODE={node}
-    ==================================================
-    """
+        ==================================================
+        TIME={timestamp}
+        USER={username}
+        PHONE={phone}
+        QUERY={query}
+        RESPONSE_TIME={response_time}s
+        POD={pod}
+        NODE={node}
+        ==================================================
+        """
 
         print(log)
         sys.stdout.flush()
 
-        return f'''
+        page = '''
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
-            <title>Request Submitted</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Request received</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+            <style>
+                :root {
+                    --paper: #FBF8F1;
+                    --forest: #2E5A46;
+                    --forest-deep: #1C3A2C;
+                    --forest-bright: #4A8368;
+                    --ink: #20302A;
+                    --muted: #6B7A72;
+                    --brass: #CDA23F;
+                    --line: #EAE3D5;
+                }
+
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+
+                body {
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    background: var(--paper);
+                    color: var(--ink);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 24px;
+                    -webkit-font-smoothing: antialiased;
+                }
+
+                .card {
+                    width: 100%;
+                    max-width: 460px;
+                    background: #fff;
+                    border: 1px solid var(--line);
+                    border-radius: 26px;
+                    padding: 52px 44px;
+                    text-align: center;
+                    box-shadow: 0 30px 80px -30px rgba(28,58,44,0.4);
+                    animation: rise .6s cubic-bezier(.2,.7,.2,1) both;
+                }
+
+                @keyframes rise {
+                    from { opacity: 0; transform: translateY(16px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
+                .seal {
+                    width: 88px;
+                    height: 88px;
+                    margin: 0 auto 26px;
+                    border-radius: 50%;
+                    background: radial-gradient(120% 120% at 30% 20%, var(--forest-bright), var(--forest));
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 14px 30px -10px rgba(46,90,70,0.6);
+                }
+
+                .seal svg { width: 42px; height: 42px; }
+
+                .seal path {
+                    fill: none;
+                    stroke: #FCFBF6;
+                    stroke-width: 5;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
+                    stroke-dasharray: 48;
+                    stroke-dashoffset: 48;
+                    animation: draw .5s .35s ease forwards;
+                }
+
+                @keyframes draw { to { stroke-dashoffset: 0; } }
+
+                .eyebrow {
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 11px;
+                    letter-spacing: .2em;
+                    text-transform: uppercase;
+                    color: var(--brass);
+                    margin-bottom: 14px;
+                }
+
+                .card h1 {
+                    font-family: 'Fraunces', Georgia, serif;
+                    font-weight: 500;
+                    font-size: 30px;
+                    color: var(--ink);
+                    margin-bottom: 12px;
+                    letter-spacing: -.01em;
+                }
+
+                .card > p {
+                    color: var(--muted);
+                    font-size: 15px;
+                    line-height: 1.65;
+                    max-width: 32ch;
+                    margin: 0 auto 30px;
+                }
+
+                .home-link {
+                    display: inline-block;
+                    padding: 14px 28px;
+                    background: linear-gradient(135deg, var(--forest-bright), var(--forest));
+                    color: #FCFBF6;
+                    text-decoration: none;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    box-shadow: 0 12px 24px -10px rgba(46,90,70,0.8);
+                    transition: transform .2s, filter .2s;
+                }
+
+                .home-link:hover { transform: translateY(-2px); filter: brightness(1.05); }
+
+                .quote {
+                    text-align: left;
+                    background: #F6F3EA;
+                    border: 1px solid var(--line);
+                    border-left: 3px solid var(--brass);
+                    border-radius: 12px;
+                    padding: 14px 16px;
+                    margin: 0 0 30px;
+                    font-size: 14px;
+                    line-height: 1.55;
+                    color: var(--ink);
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+
+                .quote span {
+                    display: block;
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 10px;
+                    letter-spacing: .16em;
+                    text-transform: uppercase;
+                    color: var(--muted);
+                    margin-bottom: 6px;
+                }
+
+                .ref {
+                    margin-top: 26px;
+                    padding-top: 20px;
+                    border-top: 1px solid var(--line);
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 12px;
+                    color: var(--muted);
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    * { animation: none !important; transition: none !important; }
+                }
+            </style>
         </head>
         <body>
-
-            <h1>Hello {username}</h1>
-
-            <h2>Request Submitted Successfully</h2>
-
+            <div class="card">
+                <div class="seal">
+                    <svg viewBox="0 0 52 52"><path d="M14 27 l8 8 l16 -18"/></svg>
+                </div>
+                <div class="eyebrow">Request received</div>
+                <h1>Thank you, __USERNAME__</h1>
+                <p>Your request is in our queue and a member of our team will call you back at <strong>__PHONE__</strong> shortly. Nothing more for you to do right now.</p>
+                <div class="quote"><span>Your query</span>__QUERY__</div>
+                <a class="home-link" href="/">Submit another request</a>
+                <div class="ref">You'll hear from a real person soon</div>
+            </div>
         </body>
         </html>
         '''
+
+        return page.replace("__USERNAME__", safe_name).replace("__PHONE__", safe_phone).replace("__QUERY__", safe_query)
+
 
     app.run(host="0.0.0.0", port=5000)
