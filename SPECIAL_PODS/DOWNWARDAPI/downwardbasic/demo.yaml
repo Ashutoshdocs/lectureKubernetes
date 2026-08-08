@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downwardapi-demo
+  labels:
+    app: downwardapi-demo
+    tier: backend
+    environment: demo
+  annotations:
+    owner: "unassigned"
+    build: "1.0.0"
+    note: "change me with kubectl annotate and watch the volume file update live"
+spec:
+  containers:
+  - name: demo
+    image: busybox:1.36
+    command: ["sh", "-c"]
+    args:
+    - |
+      while true; do
+        echo "===================== DOWNWARD API ====================="
+        echo "-- env vars (fieldRef): fixed at pod start, never change --"
+        echo "  POD_NAME      = $MY_POD_NAME"
+        echo "  NAMESPACE     = $MY_POD_NAMESPACE"
+        echo "  POD_UID       = $MY_POD_UID"
+        echo "  POD_IP        = $MY_POD_IP"
+        echo "  HOST_IP       = $MY_HOST_IP"
+        echo "  NODE_NAME     = $MY_NODE_NAME"
+        echo "  SERVICE_ACCT  = $MY_POD_SERVICE_ACCOUNT"
+        echo
+        echo "-- env vars (resourceFieldRef): this pod's real limits --"
+        echo "  CPU_REQUEST   = ${MY_CPU_REQUEST}m"
+        echo "  CPU_LIMIT     = ${MY_CPU_LIMIT}m"
+        echo "  MEM_REQUEST   = $MY_MEM_REQUEST bytes"
+        echo "  MEM_LIMIT     = $MY_MEM_LIMIT bytes"
+        echo
+        echo "-- downwardAPI volume (/etc/podinfo): UPDATES LIVE --"
+        echo "  labels file:"
+        sed 's/^/      /' /etc/podinfo/labels
+        echo "  annotations file:"
+        sed 's/^/      /' /etc/podinfo/annotations
+        echo "========================================================"
+        echo
+        sleep 15
+      done
+    env:
+    - name: MY_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: MY_POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: MY_POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    - name: MY_POD_UID
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.uid
+    - name: MY_POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    - name: MY_HOST_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    - name: MY_POD_SERVICE_ACCOUNT
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.serviceAccountName
+    # resourceFieldRef reads the container's resource settings.
+    # divisor "1m" reports CPU in millicores (100m -> "100").
+    - name: MY_CPU_REQUEST
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: requests.cpu
+          divisor: "1m"
+    - name: MY_CPU_LIMIT
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: limits.cpu
+          divisor: "1m"
+    - name: MY_MEM_REQUEST
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: requests.memory   # no divisor -> bytes
+    - name: MY_MEM_LIMIT
+      valueFrom:
+        resourceFieldRef:
+          containerName: demo
+          resource: limits.memory
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+      limits:
+        cpu: "500m"
+        memory: "128Mi"
+    volumeMounts:
+    - name: podinfo
+      mountPath: /etc/podinfo
+      readOnly: true
+  volumes:
+  - name: podinfo
+    downwardAPI:
+      items:
+      # labels & annotations can ONLY be exposed via a volume,
+      # never as env vars -- and the files refresh when they change.
+      - path: "labels"
+        fieldRef:
+          fieldPath: metadata.labels
+      - path: "annotations"
+        fieldRef:
+          fieldPath: metadata.annotations
+      - path: "cpu_limit"
+        resourceFieldRef:
+          containerName: demo
+          resource: limits.cpu
+          divisor: "1m"
