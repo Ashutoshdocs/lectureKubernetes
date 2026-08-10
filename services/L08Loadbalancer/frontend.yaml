@@ -538,26 +538,3 @@ spec:
               cpu: 200m
               memory: 128Mi
 
----
-apiVersion: v1
-kind: Service
-
-metadata:
-  name: fancy-frontend-lb
-
-spec:
-
-  type: LoadBalancer
-
-  selector:
-    app: fancy-frontend
-
-  ports:
-
-    - name: http
-
-      protocol: TCP
-
-      port: 80
-
-      targetPort: 80
