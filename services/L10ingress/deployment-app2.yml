@@ -1,0 +1,230 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app2-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+      <title>APP2 | Kubernetes</title>
+
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        body {
+          min-height: 100vh;
+          font-family: Arial, Helvetica, sans-serif;
+          background: linear-gradient(135deg, #111827, #581c87, #9333ea);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .container {
+          width: 90%;
+          max-width: 950px;
+        }
+
+        .card {
+          background: rgba(255, 255, 255, 0.10);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          border-radius: 24px;
+          padding: 60px;
+          text-align: center;
+          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+        }
+
+        .status {
+          display: inline-block;
+          padding: 8px 20px;
+          border-radius: 30px;
+          background: #16a34a;
+          font-size: 13px;
+          font-weight: bold;
+          letter-spacing: 1px;
+          margin-bottom: 25px;
+        }
+
+        h1 {
+          font-size: 64px;
+          margin-bottom: 15px;
+          font-weight: 700;
+        }
+
+        h1 span {
+          color: #d8b4fe;
+        }
+
+        .subtitle {
+          font-size: 22px;
+          color: #ede9fe;
+          margin-bottom: 45px;
+        }
+
+        .architecture {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+        }
+
+        .box {
+          padding: 25px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 16px;
+        }
+
+        .box h2 {
+          color: #d8b4fe;
+          font-size: 20px;
+          margin-bottom: 10px;
+        }
+
+        .box p {
+          color: #ede9fe;
+          font-size: 14px;
+          line-height: 1.6;
+        }
+
+        .request {
+          margin-top: 35px;
+          padding: 18px;
+          background: #020617;
+          border-radius: 12px;
+          font-family: monospace;
+          color: #c084fc;
+          font-size: 17px;
+        }
+
+        .info {
+          margin-top: 30px;
+          color: #ddd6fe;
+          font-size: 14px;
+        }
+
+        @media (max-width: 700px) {
+
+          .card {
+            padding: 40px 20px;
+          }
+
+          h1 {
+            font-size: 42px;
+          }
+
+          .subtitle {
+            font-size: 18px;
+          }
+
+          .architecture {
+            grid-template-columns: 1fr;
+          }
+        }
+      </style>
+    </head>
+
+    <body>
+
+      <div class="container">
+
+        <div class="card">
+
+          <div class="status">
+            APPLICATION ONLINE
+          </div>
+
+          <h1>
+            Welcome to <span>APP2</span>
+          </h1>
+
+          <p class="subtitle">
+            Kubernetes Ingress Demo Application
+          </p>
+
+          <div class="architecture">
+
+            <div class="box">
+              <h2>Kubernetes</h2>
+              <p>
+                APP2 is running inside the Kubernetes cluster.
+              </p>
+            </div>
+
+            <div class="box">
+              <h2>Deployment</h2>
+              <p>
+                APP2 is running with two pod replicas for availability.
+              </p>
+            </div>
+
+            <div class="box">
+              <h2>Ingress</h2>
+              <p>
+                HTTP traffic is routed through the /app2 path.
+              </p>
+            </div>
+
+          </div>
+
+          <div class="request">
+            Browser → Ingress → Service → APP2 Pods
+          </div>
+
+          <div class="info">
+            Kubernetes | Nginx | Ingress | DevOps Demonstration
+          </div>
+
+        </div>
+
+      </div>
+
+    </body>
+    </html>
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: app2
+
+  template:
+    metadata:
+      labels:
+        app: app2
+
+    spec:
+      containers:
+      - name: app2
+        image: nginx:alpine
+
+        ports:
+        - containerPort: 80
+
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+
+      volumes:
+      - name: html
+        configMap:
+          name: app2-html
+
