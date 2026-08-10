@@ -1,0 +1,2 @@
+ kubectl get pods -l app=vpa-demo -o jsonpath='{range .items[*]}{.metadata.name}{" => "}{.spec.containers[0].resources}{"\n"}{end}
+ kubectl get vpa vpa-demo -o jsonpath='{.status.recommendation.containerRecommendations[*].target}'

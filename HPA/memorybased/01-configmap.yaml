@@ -1,0 +1,52 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: memory-app-code
+data:
+  app.py: |
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    memory_store = []
+
+    class Handler(BaseHTTPRequestHandler):
+
+        def do_GET(self):
+
+            if self.path == "/":
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"Memory HPA Demo")
+
+            elif self.path == "/load":
+
+                # Allocate approximately 5 MiB
+                data = bytearray(5 * 1024 * 1024)
+
+                # Keep the memory referenced
+                memory_store.append(data)
+
+                current_mb = len(memory_store) * 5
+
+                self.send_response(200)
+                self.end_headers()
+
+                message = f"Allocated approximately {current_mb} MiB\n"
+                self.wfile.write(message.encode())
+
+            elif self.path == "/clear":
+
+                memory_store.clear()
+
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"Memory cleared\n")
+
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+    server = HTTPServer(("0.0.0.0", 8080), Handler)
+
+    print("Memory HPA application listening on port 8080")
+
+    server.serve_forever()

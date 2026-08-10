@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: default
+
+spec:
+  replicas: 0
+
+  selector:
+    matchLabels:
+      app: worker
+
+  template:
+    metadata:
+      labels:
+        app: worker
+
+    spec:
+      containers:
+        - name: worker
+          image: redis:7-alpine
+
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "===================================="
+              echo " KEDA DEMO WORKER STARTED"
+              echo " Hostname: $(hostname)"
+              echo "===================================="
+
+              while true
+              do
+                COUNT=$(redis-cli \
+                  -h redis.default.svc.cluster.local \
+                  -p 6379 \
+                  LLEN tasks)
+
+                echo "------------------------------------"
+                echo "Worker: $(hostname)"
+                echo "Queue length: $COUNT"
+                echo "------------------------------------"
+
+                if [ "$COUNT" -gt "0" ]; then
+
+                  TASK=$(redis-cli \
+                    -h redis.default.svc.cluster.local \
+                    -p 6379 \
+                    LPOP tasks)
+
+                  echo "Processed task: $TASK"
+
+                else
+
+                  echo "No tasks available"
+
+                fi
+
+                sleep 2
+              done

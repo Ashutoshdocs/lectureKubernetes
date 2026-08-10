@@ -1,0 +1,52 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: vpa-demo
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: vpa-demo
+
+  template:
+
+    metadata:
+      labels:
+        app: vpa-demo
+
+    spec:
+
+      containers:
+
+      - name: vpa-demo
+
+        image: busybox:1.36
+
+        command:
+        - /bin/sh
+        - -c
+
+        args:
+        - |
+          echo "VPA DEMO APPLICATION STARTED"
+
+          while true
+          do
+            for i in $(seq 1 100000)
+            do
+              echo $i > /dev/null
+            done
+          done
+
+        resources:
+
+          requests:
+            cpu: 50m
+            memory: 32Mi
+
+          limits:
+            cpu: 500m
+            memory: 256Mi
