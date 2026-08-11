@@ -1,0 +1,238 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app1
+  template:
+    metadata:
+      labels:
+        app: app1
+    spec:
+      containers:
+        - name: app1
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              cat > /usr/share/nginx/html/index.html <<'EOF'
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Application 1</title>
+                <style>
+                  * {
+                    box-sizing: border-box;
+                  }
+
+                  body {
+                    margin: 0;
+                    font-family: Arial, sans-serif;
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                  }
+
+                  .card {
+                    width: 500px;
+                    padding: 60px;
+                    text-align: center;
+                    background: rgba(255,255,255,0.15);
+                    border-radius: 25px;
+                    box-shadow: 0 25px 60px rgba(0,0,0,0.35);
+                    backdrop-filter: blur(10px);
+                  }
+
+                  h1 {
+                    font-size: 52px;
+                    margin: 0 0 15px;
+                  }
+
+                  p {
+                    font-size: 20px;
+                    opacity: 0.9;
+                  }
+
+                  .path {
+                    margin-top: 30px;
+                    padding: 14px 28px;
+                    border-radius: 30px;
+                    background: white;
+                    color: #667eea;
+                    display: inline-block;
+                    font-weight: bold;
+                    font-size: 18px;
+                  }
+                </style>
+              </head>
+
+              <body>
+                <div class="card">
+                  <h1>Application 1</h1>
+                  <p>Kubernetes Ingress Demo</p>
+                  <p>Traffic successfully routed to Application 1</p>
+                  <div class="path">/app1</div>
+                </div>
+              </body>
+              </html>
+              EOF
+
+              nginx -g 'daemon off;'
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-service
+spec:
+  type: ClusterIP
+  selector:
+    app: app1
+  ports:
+    - name: http
+      port: 40
+      targetPort: 80
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app2
+  template:
+    metadata:
+      labels:
+        app: app2
+    spec:
+      containers:
+        - name: app2
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              cat > /usr/share/nginx/html/index.html <<'EOF'
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Application 2</title>
+                <style>
+                  * {
+                    box-sizing: border-box;
+                  }
+
+                  body {
+                    margin: 0;
+                    font-family: Arial, sans-serif;
+                    background: linear-gradient(135deg, #11998e, #38ef7d);
+                    height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                  }
+
+                  .card {
+                    width: 500px;
+                    padding: 60px;
+                    text-align: center;
+                    background: rgba(0,0,0,0.18);
+                    border-radius: 25px;
+                    box-shadow: 0 25px 60px rgba(0,0,0,0.35);
+                  }
+
+                  h1 {
+                    font-size: 52px;
+                    margin: 0 0 15px;
+                  }
+
+                  p {
+                    font-size: 20px;
+                    opacity: 0.9;
+                  }
+
+                  .path {
+                    margin-top: 30px;
+                    padding: 14px 28px;
+                    border-radius: 30px;
+                    background: white;
+                    color: #11998e;
+                    display: inline-block;
+                    font-weight: bold;
+                    font-size: 18px;
+                  }
+                </style>
+              </head>
+
+              <body>
+                <div class="card">
+                  <h1>Application 2</h1>
+                  <p>Kubernetes Ingress Demo</p>
+                  <p>Traffic successfully routed to Application 2</p>
+                  <div class="path">/app2</div>
+                </div>
+              </body>
+              </html>
+              EOF
+
+              nginx -g 'daemon off;'
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-service
+spec:
+  type: ClusterIP
+  selector:
+    app: app2
+  ports:
+    - name: http
+      port: 40
+      targetPort: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /app1(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: app1-service
+                port:
+                  number: 40
+
+          - path: /app2(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: app2-service
+                port:
+                  number: 40
