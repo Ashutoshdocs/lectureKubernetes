@@ -1,0 +1,249 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: check1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: check1
+  template:
+    metadata:
+      labels:
+        app: check1
+    spec:
+      containers:
+        - name: check1
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              cat > /usr/share/nginx/html/index.html <<'EOF'
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Check 1</title>
+                <style>
+                  * {
+                    box-sizing: border-box;
+                  }
+
+                  body {
+                    margin: 0;
+                    font-family: Arial, sans-serif;
+                    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+                    height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                  }
+
+                  .card {
+                    width: 500px;
+                    padding: 60px;
+                    text-align: center;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 25px;
+                    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+                  }
+
+                  .status {
+                    font-size: 70px;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                  }
+
+                  h1 {
+                    font-size: 48px;
+                    margin: 0;
+                  }
+
+                  p {
+                    font-size: 20px;
+                    opacity: 0.9;
+                  }
+
+                  .path {
+                    margin-top: 30px;
+                    padding: 14px 28px;
+                    border-radius: 30px;
+                    background: #2ecc71;
+                    color: white;
+                    display: inline-block;
+                    font-weight: bold;
+                    font-size: 18px;
+                  }
+                </style>
+              </head>
+
+              <body>
+                <div class="card">
+                  <div class="status">OK</div>
+                  <h1>Check 1</h1>
+                  <p>Service is healthy and reachable</p>
+                  <div class="path">/check1</div>
+                </div>
+              </body>
+              </html>
+              EOF
+
+              nginx -g 'daemon off;'
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: check1-service
+spec:
+  type: ClusterIP
+  selector:
+    app: check1
+  ports:
+    - name: http
+      port: 50
+      targetPort: 80
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: check2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: check2
+  template:
+    metadata:
+      labels:
+        app: check2
+    spec:
+      containers:
+        - name: check2
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              cat > /usr/share/nginx/html/index.html <<'EOF'
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Check 2</title>
+                <style>
+                  * {
+                    box-sizing: border-box;
+                  }
+
+                  body {
+                    margin: 0;
+                    font-family: Arial, sans-serif;
+                    background: linear-gradient(135deg, #141e30, #243b55);
+                    height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                  }
+
+                  .card {
+                    width: 500px;
+                    padding: 60px;
+                    text-align: center;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 25px;
+                    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+                  }
+
+                  .status {
+                    font-size: 70px;
+                    font-weight: bold;
+                    margin-bottom: 15px;
+                  }
+
+                  h1 {
+                    font-size: 48px;
+                    margin: 0;
+                  }
+
+                  p {
+                    font-size: 20px;
+                    opacity: 0.9;
+                  }
+
+                  .path {
+                    margin-top: 30px;
+                    padding: 14px 28px;
+                    border-radius: 30px;
+                    background: #3498db;
+                    color: white;
+                    display: inline-block;
+                    font-weight: bold;
+                    font-size: 18px;
+                  }
+                </style>
+              </head>
+
+              <body>
+                <div class="card">
+                  <div class="status">OK</div>
+                  <h1>Check 2</h1>
+                  <p>Service is healthy and reachable</p>
+                  <div class="path">/check2</div>
+                </div>
+              </body>
+              </html>
+              EOF
+
+              nginx -g 'daemon off;'
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: check2-service
+spec:
+  type: ClusterIP
+  selector:
+    app: check2
+  ports:
+    - name: http
+      port: 50
+      targetPort: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: check-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /check1(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: check1-service
+                port:
+                  number: 50
+
+          - path: /check2(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: check2-service
+                port:
+                  number: 50
