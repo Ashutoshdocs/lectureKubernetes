@@ -1,0 +1,539 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fancy-frontend02
+  labels:
+    app: fancy-frontend02
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: fancy-frontend02
+
+  template:
+
+    metadata:
+      labels:
+        app: fancy-frontend02
+
+    spec:
+
+      containers:
+
+        - name: nginx
+          image: nginx:alpine
+
+          ports:
+            - containerPort: 80
+
+          # -----------------------------------------
+          # POD INFORMATION
+          # -----------------------------------------
+
+          env:
+
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+          # -----------------------------------------
+          # CREATE HTML USING POD INFORMATION
+          # -----------------------------------------
+
+          command:
+            - /bin/sh
+            - -c
+
+          args:
+
+            - |
+              cat > /usr/share/nginx/html/index.html <<EOF
+
+              <!DOCTYPE html>
+
+              <html lang="en">
+
+              <head>
+
+                <meta charset="UTF-8">
+
+                <meta
+                  name="viewport"
+                  content="width=device-width, initial-scale=1.0">
+
+                <meta
+                  http-equiv="refresh"
+                  content="10">
+
+                <title>AKS LoadBalancer Demo</title>
+
+                <style>
+
+                  * {
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                  }
+
+                  body {
+
+                    font-family:
+                      "Segoe UI",
+                      Arial,
+                      sans-serif;
+
+                    min-height: 100vh;
+
+                    display: flex;
+
+                    align-items: center;
+
+                    justify-content: center;
+
+                    padding: 40px;
+
+                    color: white;
+
+                    background:
+                      linear-gradient(
+                        135deg,
+                        #020617,
+                        #0f172a,
+                        #172554
+                      );
+                  }
+
+                  .container {
+
+                    width: 100%;
+
+                    max-width: 1100px;
+
+                    background:
+                      rgba(15, 23, 42, 0.96);
+
+                    border:
+                      1px solid
+                      rgba(255,255,255,0.12);
+
+                    border-radius: 25px;
+
+                    padding: 55px;
+
+                    box-shadow:
+                      0 30px 80px
+                      rgba(0,0,0,0.5);
+                  }
+
+                  .status {
+
+                    display: inline-block;
+
+                    padding: 9px 18px;
+
+                    border-radius: 30px;
+
+                    border:
+                      1px solid #22c55e;
+
+                    color: #86efac;
+
+                    background:
+                      rgba(34,197,94,0.10);
+
+                    font-weight: 600;
+
+                    margin-bottom: 25px;
+                  }
+
+                  .dot {
+
+                    display: inline-block;
+
+                    width: 10px;
+
+                    height: 10px;
+
+                    border-radius: 50%;
+
+                    background: #22c55e;
+
+                    margin-right: 8px;
+                  }
+
+                  h1 {
+
+                    font-size: 48px;
+
+                    margin-bottom: 12px;
+
+                    background:
+                      linear-gradient(
+                        90deg,
+                        #60a5fa,
+                        #c084fc
+                      );
+
+                    -webkit-background-clip: text;
+
+                    -webkit-text-fill-color:
+                      transparent;
+                  }
+
+                  .subtitle {
+
+                    color: #94a3b8;
+
+                    font-size: 20px;
+
+                    margin-bottom: 35px;
+                  }
+
+                  .traffic {
+
+                    text-align: center;
+
+                    padding: 20px;
+
+                    border-radius: 15px;
+
+                    background:
+                      rgba(37,99,235,0.12);
+
+                    border:
+                      1px solid
+                      rgba(96,165,250,0.25);
+
+                    margin-bottom: 30px;
+
+                    color: #93c5fd;
+
+                    font-size: 17px;
+                  }
+
+                  .pod-card {
+
+                    padding: 30px;
+
+                    border-radius: 20px;
+
+                    background:
+                      linear-gradient(
+                        145deg,
+                        #1e293b,
+                        #0f172a
+                      );
+
+                    border:
+                      1px solid
+                      rgba(96,165,250,0.35);
+
+                    box-shadow:
+                      0 15px 40px
+                      rgba(0,0,0,0.25);
+
+                    margin-bottom: 30px;
+                  }
+
+                  .pod-title {
+
+                    color: #60a5fa;
+
+                    font-size: 14px;
+
+                    text-transform:
+                      uppercase;
+
+                    letter-spacing: 2px;
+
+                    margin-bottom: 12px;
+                  }
+
+                  .pod-name {
+
+                    font-size: 32px;
+
+                    font-weight: 700;
+
+                    color: #ffffff;
+
+                    word-break: break-all;
+
+                    margin-bottom: 25px;
+                  }
+
+                  .details {
+
+                    display: grid;
+
+                    grid-template-columns:
+                      repeat(
+                        auto-fit,
+                        minmax(220px,1fr)
+                      );
+
+                    gap: 15px;
+                  }
+
+                  .detail {
+
+                    background:
+                      rgba(255,255,255,0.05);
+
+                    border-radius: 12px;
+
+                    padding: 18px;
+                  }
+
+                  .label {
+
+                    color: #64748b;
+
+                    font-size: 12px;
+
+                    text-transform:
+                      uppercase;
+
+                    letter-spacing: 1px;
+
+                    margin-bottom: 7px;
+                  }
+
+                  .value {
+
+                    color: #e2e8f0;
+
+                    font-family:
+                      Consolas,
+                      monospace;
+
+                    font-size: 15px;
+
+                    word-break: break-all;
+                  }
+
+                  .architecture {
+
+                    text-align: center;
+
+                    padding: 20px;
+
+                    border-radius: 15px;
+
+                    background:
+                      rgba(255,255,255,0.04);
+
+                    color: #94a3b8;
+
+                    font-size: 14px;
+
+                    line-height: 2;
+                  }
+
+                  .highlight {
+
+                    color: #60a5fa;
+
+                    font-weight: bold;
+                  }
+
+                  .footer {
+
+                    margin-top: 30px;
+
+                    padding-top: 25px;
+
+                    border-top:
+                      1px solid
+                      rgba(255,255,255,0.08);
+
+                    text-align: center;
+
+                    color: #64748b;
+
+                    font-size: 13px;
+                  }
+
+                </style>
+
+              </head>
+
+              <body>
+
+                <div class="container">
+
+                  <div class="status">
+
+                    <span class="dot"></span>
+
+                    LOADBALANCER REQUEST RECEIVED
+
+                  </div>
+
+                  <h1>
+                    Azure Kubernetes Service
+                  </h1>
+
+                  <div class="subtitle">
+                    LoadBalancer Pod Identification Demo
+                  </div>
+
+                  <div class="traffic">
+
+                    INTERNET
+                    &nbsp; --> &nbsp;
+                    AZURE LOAD BALANCER
+                    &nbsp; --> &nbsp;
+                    KUBERNETES SERVICE
+                    &nbsp; --> &nbsp;
+                    <span class="highlight">
+                      THIS POD
+                    </span>
+
+                  </div>
+
+                  <div class="pod-card">
+
+                    <div class="pod-title">
+                      Request handled by
+                    </div>
+
+                    <div class="pod-name">
+                      $POD_NAME
+                    </div>
+
+                    <div class="details">
+
+                      <div class="detail">
+
+                        <div class="label">
+                          Pod Name
+                        </div>
+
+                        <div class="value">
+                          $POD_NAME
+                        </div>
+
+                      </div>
+
+                      <div class="detail">
+
+                        <div class="label">
+                          Pod IP
+                        </div>
+
+                        <div class="value">
+                          $POD_IP
+                        </div>
+
+                      </div>
+
+                      <div class="detail">
+
+                        <div class="label">
+                          Node
+                        </div>
+
+                        <div class="value">
+                          $NODE_NAME
+                        </div>
+
+                      </div>
+
+                      <div class="detail">
+
+                        <div class="label">
+                          Namespace
+                        </div>
+
+                        <div class="value">
+                          $POD_NAMESPACE
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <div class="architecture">
+
+                    Azure Load Balancer
+                    <br>
+
+                    <span class="highlight">
+                      |
+                    </span>
+                    <br>
+
+                    Kubernetes LoadBalancer Service
+                    <br>
+
+                    <span class="highlight">
+                      |
+                    </span>
+                    <br>
+
+                    Pod selected by Kubernetes Service
+                    <br>
+
+                    <span class="highlight">
+                      |
+                    </span>
+                    <br>
+
+                    <strong>
+                      $POD_NAME
+                    </strong>
+
+                  </div>
+
+                  <div class="footer">
+
+                    Page automatically refreshes every
+                    10 seconds.
+
+                    <br>
+
+                    Refreshing may result in a different
+                    Pod handling the request.
+
+                  </div>
+
+                </div>
+
+              </body>
+
+              </html>
+
+              EOF
+
+              nginx -g "daemon off;"
+
+          resources:
+
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+            limits:
+              cpu: 200m
+              memory: 128Mi
