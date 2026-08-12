@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: fancy-frontend-lb02
+
+spec:
+
+  type: LoadBalancer
+
+  selector:
+    app: fancy-frontend02
+
+  ports:
+
+    - name: http
+
+      protocol: TCP
+
+      port: 90
+
+      targetPort: 80
