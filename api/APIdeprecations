@@ -1,0 +1,80 @@
+# Docker (kind needs a container runtime)
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER && newgrp docker
+
+# kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install kubectl /usr/local/bin/
+
+
+cd ~
+curl -LO https://dl.k8s.io/release/v1.21.14/bin/linux/amd64/kubectl
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm -f kubectl
+
+# kind
+curl -Lo kind https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
+sudo install kind /usr/local/bin/
+
+# kubectl-convert (plugin that rewrites manifests to newer API versions)
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl-convert"
+sudo install kubectl-convert /usr/local/bin/
+
+# pluto (Fairwinds — detects deprecated/removed APIs)
+PLUTO_VER=$(curl -s https://api.github.com/repos/FairwindsOps/pluto/releases/latest \
+  | grep -oP '"tag_name":\s*"\K[^"]+' | tr -d v)
+echo "Installing pluto $PLUTO_VER"
+curl -L "https://github.com/FairwindsOps/pluto/releases/download/v${PLUTO_VER}/pluto_${PLUTO_VER}_linux_amd64.tar.gz" | tar xz pluto
+sudo install pluto /usr/local/bin/
+pluto version
+
+#create cluster
+kind create cluster --name deprec-demo --image kindest/node:v1.21.14
+kubectl config use-context kind-deprec-demo
+kubectl version --short
+
+
+#create old manifest
+cat > old-ingress.yaml <<'EOF'
+apiVersion: networking.k8s.io/v1beta1   # <-- deprecated
+kind: Ingress
+metadata:
+  name: demo-ingress
+spec:
+  rules:
+  - host: demo.example.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: demo-svc
+          servicePort: 80
+EOF
+
+kubectl apply -f old-ingress.yaml
+
+
+
+
+pluto detect-files -d .
+pluto detect-all-in-cluster -owide
+kubectl get --raw /metrics | grep apiserver_requested_deprecated_apis
+
+
+kubectl-convert -f old-ingress.yaml --output-version networking.k8s.io/v1 -o yaml > new-ingress.yaml
+cat new-ingress.yaml
+
+kubectl apply -f new-ingress.yaml   # no deprecation warning this time
+
+
+kind create cluster --name removed-demo --image kindest/node:v1.25.3
+kubectl config use-context kind-removed-demo
+
+kubectl apply -f old-ingress.yaml
+# error: unable to recognize "old-ingress.yaml": no matches for kind
+#        "Ingress" in version "networking.k8s.io/v1beta1"
+
+kubectl apply -f new-ingress.yaml   # works fine
+
+kind delete cluster --name deprec-demo
+kind delete cluster --name removed-demo
