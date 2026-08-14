@@ -1,0 +1,1 @@
+az ad sp create-for-rbac --name github-aks-deployer --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>
