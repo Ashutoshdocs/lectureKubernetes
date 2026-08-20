@@ -1,0 +1,1522 @@
+# ============================================================
+# 1. CLUSTERIP  -  internal virtual IP (default)
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-clusterip
+data:
+  nginx.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>ClusterIP · nginx</title>
+    <style>
+      :root{
+        --accent:#22d3ee;--accent-dim:#0e7490;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>ClusterIP<span class="dot">.</span></h1>
+          <p class="tagline">The default service type. Gets a stable virtual IP reachable only from inside the cluster — perfect for internal app-to-app traffic.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by nginx :80</span>
+            <span class="badge">pod / pod-clusterip</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ another pod / service ]
+              |   cluster-internal VIP
+              v
+       svc-clusterip  (10.x.x.x)
+              |
+              v
+       <span class="hl">nginx on pod-clusterip</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — via svc-clusterip</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">No — cluster-internal only</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>kubectl exec POD -- curl svc-clusterip</code>
+          <span class="sig">curl this URL &rarr; plain box · nginx</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  python.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>ClusterIP · python</title>
+    <style>
+      :root{
+        --accent:#22d3ee;--accent-dim:#0e7490;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>ClusterIP<span class="dot">.</span></h1>
+          <p class="tagline">The default service type. Gets a stable virtual IP reachable only from inside the cluster — perfect for internal app-to-app traffic.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by python :8080</span>
+            <span class="badge">pod / pod-clusterip</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ another pod / service ]
+              |   cluster-internal VIP
+              v
+       svc-clusterip  (10.x.x.x)
+              |
+              v
+       <span class="hl">python on pod-clusterip</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — via svc-clusterip</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">No — cluster-internal only</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>kubectl exec POD -- curl svc-clusterip:8080</code>
+          <span class="sig">curl this URL &rarr; plain box · python</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  nginx.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║               KUBERNETES SERVICE  -  CLUSTERIP               ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-clusterip                             ║
+    ║  Type            : ClusterIP                                 ║
+    ║  Served By       : nginx :80                                 ║
+    ║  Pod             : pod-clusterip                             ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    another pod  ->  svc-clusterip (VIP)  ->  pod             ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES                                       ║
+    ║  From outside    : NO                                        ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  python.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║               KUBERNETES SERVICE  -  CLUSTERIP               ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-clusterip                             ║
+    ║  Type            : ClusterIP                                 ║
+    ║  Served By       : python :8080                              ║
+    ║  Pod             : pod-clusterip                             ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    another pod  ->  svc-clusterip (VIP)  ->  pod             ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES                                       ║
+    ║  From outside    : NO                                        ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  nginx.conf: |
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        root /usr/share/nginx/html;
+        charset utf-8;
+
+        location = / {
+            default_type text/html;
+            if ($http_user_agent ~* (curl|wget|libcurl|httpie|python-requests|Go-http|PowerShell|Wget|HTTPie|fetch)) {
+                rewrite ^ /dashboard.txt last;
+            }
+            try_files /index.html =404;
+        }
+
+        location = /dashboard.txt {
+            default_type text/plain;
+        }
+    }
+
+  server.py: |
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from pathlib import Path
+
+    BASE = Path("/www")
+    HTML = (BASE / "index.html").read_bytes()
+    TXT  = (BASE / "dashboard.txt").read_bytes()
+    CLI  = ("curl", "wget", "libcurl", "httpie", "python-requests", "go-http", "powershell", "fetch")
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "k8s-svc-demo"
+
+        def _send(self, body, ctype):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype + "; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == "/favicon.ico":
+                self.send_response(404); self.end_headers(); return
+            if self.path.rstrip("/") == "/dashboard.txt":
+                return self._send(TXT, "text/plain")
+            ua = (self.headers.get("User-Agent") or "").lower()
+            if any(tok in ua for tok in CLI):
+                self._send(TXT, "text/plain")
+            else:
+                self._send(HTML, "text/html")
+
+        def log_message(self, *args):
+            pass
+
+    if __name__ == "__main__":
+        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-clusterip
+  labels:
+    app: demo-clusterip
+spec:
+  volumes:
+  - name: web
+    configMap:
+      name: web-clusterip
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - name: http
+      containerPort: 80
+    volumeMounts:
+    - name: web
+      mountPath: /usr/share/nginx/html/index.html
+      subPath: nginx.html
+    - name: web
+      mountPath: /usr/share/nginx/html/dashboard.txt
+      subPath: nginx.txt
+    - name: web
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: nginx.conf
+  - name: python
+    image: python:3.9-slim
+    workingDir: /www
+    command: ["python"]
+    args: ["/www/server.py"]
+    ports:
+    - name: python
+      containerPort: 8080
+    volumeMounts:
+    - name: web
+      mountPath: /www/index.html
+      subPath: python.html
+    - name: web
+      mountPath: /www/dashboard.txt
+      subPath: python.txt
+    - name: web
+      mountPath: /www/server.py
+      subPath: server.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-clusterip
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-clusterip
+  ports:
+  - name: nginx-http
+    port: 80
+    targetPort: http
+  - name: python-http
+    port: 8080
+    targetPort: python
+---
+# ============================================================
+# 2. NODEPORT  -  fixed port on every node
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-nodeport
+data:
+  nginx.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>NodePort · nginx</title>
+    <style>
+      :root{
+        --accent:#f59e0b;--accent-dim:#b45309;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>NodePort<span class="dot">.</span></h1>
+          <p class="tagline">Opens a fixed port on every node. External clients hit <NodeIP>:<nodePort> and get routed to the pod — no cloud load balancer required.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by nginx :80</span>
+            <span class="badge">pod / pod-nodeport</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ external client ]
+            |   <NodeIP>:30080 (nginx) / 30081 (python)
+            v
+          Node kube-proxy
+            |
+            v
+      svc-nodeport --> <span class="hl">nginx on pod-nodeport</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — via svc-nodeport</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">Yes — <NodeIP>:30080 / 30081</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>curl http://<NodeIP>:30080</code>
+          <span class="sig">curl this URL &rarr; plain box · nginx</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  python.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>NodePort · python</title>
+    <style>
+      :root{
+        --accent:#f59e0b;--accent-dim:#b45309;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>NodePort<span class="dot">.</span></h1>
+          <p class="tagline">Opens a fixed port on every node. External clients hit <NodeIP>:<nodePort> and get routed to the pod — no cloud load balancer required.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by python :8080</span>
+            <span class="badge">pod / pod-nodeport</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ external client ]
+            |   <NodeIP>:30080 (nginx) / 30081 (python)
+            v
+          Node kube-proxy
+            |
+            v
+      svc-nodeport --> <span class="hl">python on pod-nodeport</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — via svc-nodeport</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">Yes — <NodeIP>:30080 / 30081</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>curl http://<NodeIP>:30081</code>
+          <span class="sig">curl this URL &rarr; plain box · python</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  nginx.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║               KUBERNETES SERVICE  -  NODEPORT                ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-nodeport                              ║
+    ║  Type            : NodePort                                  ║
+    ║  Served By       : nginx :80                                 ║
+    ║  Pod             : pod-nodeport                              ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    client -> NodeIP:30080/30081 -> node -> pod               ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES                                       ║
+    ║  From outside    : YES  <NodeIP>:30080/30081                 ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  python.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║               KUBERNETES SERVICE  -  NODEPORT                ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-nodeport                              ║
+    ║  Type            : NodePort                                  ║
+    ║  Served By       : python :8080                              ║
+    ║  Pod             : pod-nodeport                              ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    client -> NodeIP:30080/30081 -> node -> pod               ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES                                       ║
+    ║  From outside    : YES  <NodeIP>:30080/30081                 ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  nginx.conf: |
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        root /usr/share/nginx/html;
+        charset utf-8;
+
+        location = / {
+            default_type text/html;
+            if ($http_user_agent ~* (curl|wget|libcurl|httpie|python-requests|Go-http|PowerShell|Wget|HTTPie|fetch)) {
+                rewrite ^ /dashboard.txt last;
+            }
+            try_files /index.html =404;
+        }
+
+        location = /dashboard.txt {
+            default_type text/plain;
+        }
+    }
+
+  server.py: |
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from pathlib import Path
+
+    BASE = Path("/www")
+    HTML = (BASE / "index.html").read_bytes()
+    TXT  = (BASE / "dashboard.txt").read_bytes()
+    CLI  = ("curl", "wget", "libcurl", "httpie", "python-requests", "go-http", "powershell", "fetch")
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "k8s-svc-demo"
+
+        def _send(self, body, ctype):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype + "; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == "/favicon.ico":
+                self.send_response(404); self.end_headers(); return
+            if self.path.rstrip("/") == "/dashboard.txt":
+                return self._send(TXT, "text/plain")
+            ua = (self.headers.get("User-Agent") or "").lower()
+            if any(tok in ua for tok in CLI):
+                self._send(TXT, "text/plain")
+            else:
+                self._send(HTML, "text/html")
+
+        def log_message(self, *args):
+            pass
+
+    if __name__ == "__main__":
+        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nodeport
+  labels:
+    app: demo-nodeport
+spec:
+  volumes:
+  - name: web
+    configMap:
+      name: web-nodeport
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - name: http
+      containerPort: 80
+    volumeMounts:
+    - name: web
+      mountPath: /usr/share/nginx/html/index.html
+      subPath: nginx.html
+    - name: web
+      mountPath: /usr/share/nginx/html/dashboard.txt
+      subPath: nginx.txt
+    - name: web
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: nginx.conf
+  - name: python
+    image: python:3.9-slim
+    workingDir: /www
+    command: ["python"]
+    args: ["/www/server.py"]
+    ports:
+    - name: python
+      containerPort: 8080
+    volumeMounts:
+    - name: web
+      mountPath: /www/index.html
+      subPath: python.html
+    - name: web
+      mountPath: /www/dashboard.txt
+      subPath: python.txt
+    - name: web
+      mountPath: /www/server.py
+      subPath: server.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: demo-nodeport
+  ports:
+  - name: nginx-http
+    port: 80
+    targetPort: http
+    nodePort: 30080
+  - name: python-http
+    port: 8080
+    targetPort: python
+    nodePort: 30081
+---
+# ============================================================
+# 3. LOADBALANCER  -  external cloud load balancer
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-loadbalancer
+data:
+  nginx.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>LoadBalancer · nginx</title>
+    <style>
+      :root{
+        --accent:#a78bfa;--accent-dim:#6d28d9;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>LoadBalancer<span class="dot">.</span></h1>
+          <p class="tagline">Provisions an external load balancer from the cloud provider and gives the service a public IP. The standard way to expose a service to the internet.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by nginx :80</span>
+            <span class="badge">pod / pod-loadbalancer</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ internet ]
+         |   external IP
+         v
+     Cloud Load Balancer
+         |
+         v
+     svc-loadbalancer --> <span class="hl">nginx on pod-loadbalancer</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — via svc-loadbalancer</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">Yes — external/public IP</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>curl http://<EXTERNAL-IP></code>
+          <span class="sig">curl this URL &rarr; plain box · nginx</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  python.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>LoadBalancer · python</title>
+    <style>
+      :root{
+        --accent:#a78bfa;--accent-dim:#6d28d9;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>LoadBalancer<span class="dot">.</span></h1>
+          <p class="tagline">Provisions an external load balancer from the cloud provider and gives the service a public IP. The standard way to expose a service to the internet.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by python :8080</span>
+            <span class="badge">pod / pod-loadbalancer</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ internet ]
+         |   external IP
+         v
+     Cloud Load Balancer
+         |
+         v
+     svc-loadbalancer --> <span class="hl">python on pod-loadbalancer</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — via svc-loadbalancer</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">Yes — external/public IP</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>curl http://<EXTERNAL-IP>:8080</code>
+          <span class="sig">curl this URL &rarr; plain box · python</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  nginx.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║             KUBERNETES SERVICE  -  LOADBALANCER              ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-loadbalancer                          ║
+    ║  Type            : LoadBalancer                              ║
+    ║  Served By       : nginx :80                                 ║
+    ║  Pod             : pod-loadbalancer                          ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    internet -> cloud LB (ext IP) -> svc -> pod               ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES                                       ║
+    ║  From outside    : YES  (external IP)                        ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  python.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║             KUBERNETES SERVICE  -  LOADBALANCER              ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-loadbalancer                          ║
+    ║  Type            : LoadBalancer                              ║
+    ║  Served By       : python :8080                              ║
+    ║  Pod             : pod-loadbalancer                          ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    internet -> cloud LB (ext IP) -> svc -> pod               ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES                                       ║
+    ║  From outside    : YES  (external IP)                        ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  nginx.conf: |
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        root /usr/share/nginx/html;
+        charset utf-8;
+
+        location = / {
+            default_type text/html;
+            if ($http_user_agent ~* (curl|wget|libcurl|httpie|python-requests|Go-http|PowerShell|Wget|HTTPie|fetch)) {
+                rewrite ^ /dashboard.txt last;
+            }
+            try_files /index.html =404;
+        }
+
+        location = /dashboard.txt {
+            default_type text/plain;
+        }
+    }
+
+  server.py: |
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from pathlib import Path
+
+    BASE = Path("/www")
+    HTML = (BASE / "index.html").read_bytes()
+    TXT  = (BASE / "dashboard.txt").read_bytes()
+    CLI  = ("curl", "wget", "libcurl", "httpie", "python-requests", "go-http", "powershell", "fetch")
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "k8s-svc-demo"
+
+        def _send(self, body, ctype):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype + "; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == "/favicon.ico":
+                self.send_response(404); self.end_headers(); return
+            if self.path.rstrip("/") == "/dashboard.txt":
+                return self._send(TXT, "text/plain")
+            ua = (self.headers.get("User-Agent") or "").lower()
+            if any(tok in ua for tok in CLI):
+                self._send(TXT, "text/plain")
+            else:
+                self._send(HTML, "text/html")
+
+        def log_message(self, *args):
+            pass
+
+    if __name__ == "__main__":
+        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-loadbalancer
+  labels:
+    app: demo-loadbalancer
+spec:
+  volumes:
+  - name: web
+    configMap:
+      name: web-loadbalancer
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - name: http
+      containerPort: 80
+    volumeMounts:
+    - name: web
+      mountPath: /usr/share/nginx/html/index.html
+      subPath: nginx.html
+    - name: web
+      mountPath: /usr/share/nginx/html/dashboard.txt
+      subPath: nginx.txt
+    - name: web
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: nginx.conf
+  - name: python
+    image: python:3.9-slim
+    workingDir: /www
+    command: ["python"]
+    args: ["/www/server.py"]
+    ports:
+    - name: python
+      containerPort: 8080
+    volumeMounts:
+    - name: web
+      mountPath: /www/index.html
+      subPath: python.html
+    - name: web
+      mountPath: /www/dashboard.txt
+      subPath: python.txt
+    - name: web
+      mountPath: /www/server.py
+      subPath: server.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: demo-loadbalancer
+  ports:
+  - name: nginx-http
+    port: 80
+    targetPort: http
+  - name: python-http
+    port: 8080
+    targetPort: python
+---
+# ============================================================
+# 4. HEADLESS  -  clusterIP: None, DNS straight to pods
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-headless
+data:
+  nginx.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>Headless · nginx</title>
+    <style>
+      :root{
+        --accent:#fb7185;--accent-dim:#be123c;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>Headless<span class="dot">.</span></h1>
+          <p class="tagline">clusterIP: None. No virtual IP and no proxying — DNS returns the pod IPs directly. Used for stateful sets and client-side load balancing.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by nginx :80</span>
+            <span class="badge">pod / pod-headless</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ client in cluster ]
+            |   DNS query svc-headless
+            v
+     svc-headless (clusterIP: None)
+            |   returns A-records = pod IPs
+            v
+       <span class="hl">nginx on pod-headless</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — DNS returns pod IPs</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">No — DNS / pod IPs only</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>kubectl exec POD -- curl svc-headless</code>
+          <span class="sig">curl this URL &rarr; plain box · nginx</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  python.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="10">
+    <title>Headless · python</title>
+    <style>
+      :root{
+        --accent:#fb7185;--accent-dim:#be123c;
+        --bg:#0a1626;--panel:#0f2136;--ink:#dbe7f3;--muted:#7c93a8;
+        --line:rgba(120,160,200,.14);
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);
+        background:
+          linear-gradient(var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/28px 28px,
+          radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 60%),
+          var(--bg);
+        display:flex;align-items:center;justify-content:center;padding:32px 18px;min-height:100vh;
+      }
+      .card{width:100%;max-width:720px;background:linear-gradient(180deg,var(--panel),#0b1a2b);
+        border:1px solid var(--line);border-radius:18px;
+        box-shadow:0 30px 80px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden;}
+      .top{padding:26px 30px 22px;border-bottom:1px dashed var(--line);position:relative;}
+      .top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(var(--accent),var(--accent-dim));}
+      .eyebrow{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+        font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+      h1{margin:0;font-size:clamp(30px,7vw,46px);line-height:1;letter-spacing:-.02em;font-weight:800;color:#fff;}
+      h1 .dot{color:var(--accent)}
+      .tagline{margin:12px 0 0;color:var(--muted);font-size:15px;max-width:52ch}
+      .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+      .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;padding:6px 11px;
+        border-radius:999px;border:1px solid var(--line);color:var(--ink);background:rgba(255,255,255,.02);}
+      .badge.served{border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent);
+        box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent) inset;}
+      .body{padding:24px 30px 8px}
+      pre.route{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;line-height:1.5;color:var(--ink);
+        background:#081320;border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 22px;overflow:auto;}
+      pre.route .hl{color:var(--accent);font-weight:700}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px}
+      .cell{background:var(--panel);padding:14px 16px}
+      .cell .k{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+      .cell .v{margin:0;font-size:15px;color:#fff;font-weight:600}
+      @media(max-width:520px){.grid{grid-template-columns:1fr}}
+      .foot{padding:16px 30px 26px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;
+        gap:14px;flex-wrap:wrap;align-items:center;}
+      .foot code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--accent);
+        background:#081320;border:1px solid var(--line);padding:6px 10px;border-radius:8px;}
+      .foot .sig{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+      .pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+        margin-right:7px;vertical-align:middle;animation:p 2s infinite}
+      @keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+        70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      @media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+    </style>
+    </head>
+    <body>
+      <main class="card">
+        <div class="top">
+          <p class="eyebrow">Kubernetes · Service Networking</p>
+          <h1>Headless<span class="dot">.</span></h1>
+          <p class="tagline">clusterIP: None. No virtual IP and no proxying — DNS returns the pod IPs directly. Used for stateful sets and client-side load balancing.</p>
+          <div class="badges">
+            <span class="badge served"><span class="pulse"></span>served by python :8080</span>
+            <span class="badge">pod / pod-headless</span>
+            <span class="badge">browser view (colour)</span>
+          </div>
+        </div>
+        <div class="body">
+          <pre class="route">[ client in cluster ]
+            |   DNS query svc-headless
+            v
+     svc-headless (clusterIP: None)
+            |   returns A-records = pod IPs
+            v
+       <span class="hl">python on pod-headless</span></pre>
+          <div class="grid">
+            <div class="cell"><p class="k">Reachable inside cluster</p><p class="v">Yes — DNS returns pod IPs</p></div>
+            <div class="cell"><p class="k">Reachable from outside</p><p class="v">No — DNS / pod IPs only</p></div>
+            <div class="cell"><p class="k">nginx endpoint</p><p class="v">port 80 &rarr; http</p></div>
+            <div class="cell"><p class="k">python endpoint</p><p class="v">port 8080 &rarr; python</p></div>
+          </div>
+        </div>
+        <div class="foot">
+          <code>kubectl exec POD -- curl svc-headless:8080</code>
+          <span class="sig">curl this URL &rarr; plain box · python</span>
+        </div>
+      </main>
+    </body>
+    </html>
+
+  nginx.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║               KUBERNETES SERVICE  -  HEADLESS                ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-headless                              ║
+    ║  Type            : Headless                                  ║
+    ║  Served By       : nginx :80                                 ║
+    ║  Pod             : pod-headless                              ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    client -> DNS(svc-headless) -> pod IPs directly           ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES  (DNS -> pod IPs)                     ║
+    ║  From outside    : NO                                        ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  python.txt: |
+    ╔══════════════════════════════════════════════════════════════╗
+    ║               KUBERNETES SERVICE  -  HEADLESS                ║
+    ║                 curl / CLI view (plain text)                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║                                                              ║
+    ║  Service Details                                             ║
+    ║  ----------------------------------------------------------  ║
+    ║  Service Name    : svc-headless                              ║
+    ║  Type            : Headless                                  ║
+    ║  Served By       : python :8080                              ║
+    ║  Pod             : pod-headless                              ║
+    ║                                                              ║
+    ║  Traffic Path                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║    client -> DNS(svc-headless) -> pod IPs directly           ║
+    ║                                                              ║
+    ║  Reachability                                                ║
+    ║  ----------------------------------------------------------  ║
+    ║  Inside cluster  : YES  (DNS -> pod IPs)                     ║
+    ║  From outside    : NO                                        ║
+    ║  Port mapping    : 80->http , 8080->python                   ║
+    ║                                                              ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  [OK] Open this URL in a browser for the colour version      ║
+    ╚══════════════════════════════════════════════════════════════╝
+
+  nginx.conf: |
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        root /usr/share/nginx/html;
+        charset utf-8;
+
+        location = / {
+            default_type text/html;
+            if ($http_user_agent ~* (curl|wget|libcurl|httpie|python-requests|Go-http|PowerShell|Wget|HTTPie|fetch)) {
+                rewrite ^ /dashboard.txt last;
+            }
+            try_files /index.html =404;
+        }
+
+        location = /dashboard.txt {
+            default_type text/plain;
+        }
+    }
+
+  server.py: |
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from pathlib import Path
+
+    BASE = Path("/www")
+    HTML = (BASE / "index.html").read_bytes()
+    TXT  = (BASE / "dashboard.txt").read_bytes()
+    CLI  = ("curl", "wget", "libcurl", "httpie", "python-requests", "go-http", "powershell", "fetch")
+
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "k8s-svc-demo"
+
+        def _send(self, body, ctype):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype + "; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == "/favicon.ico":
+                self.send_response(404); self.end_headers(); return
+            if self.path.rstrip("/") == "/dashboard.txt":
+                return self._send(TXT, "text/plain")
+            ua = (self.headers.get("User-Agent") or "").lower()
+            if any(tok in ua for tok in CLI):
+                self._send(TXT, "text/plain")
+            else:
+                self._send(HTML, "text/html")
+
+        def log_message(self, *args):
+            pass
+
+    if __name__ == "__main__":
+        HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-headless
+  labels:
+    app: demo-headless
+spec:
+  volumes:
+  - name: web
+    configMap:
+      name: web-headless
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - name: http
+      containerPort: 80
+    volumeMounts:
+    - name: web
+      mountPath: /usr/share/nginx/html/index.html
+      subPath: nginx.html
+    - name: web
+      mountPath: /usr/share/nginx/html/dashboard.txt
+      subPath: nginx.txt
+    - name: web
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: nginx.conf
+  - name: python
+    image: python:3.9-slim
+    workingDir: /www
+    command: ["python"]
+    args: ["/www/server.py"]
+    ports:
+    - name: python
+      containerPort: 8080
+    volumeMounts:
+    - name: web
+      mountPath: /www/index.html
+      subPath: python.html
+    - name: web
+      mountPath: /www/dashboard.txt
+      subPath: python.txt
+    - name: web
+      mountPath: /www/server.py
+      subPath: server.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: demo-headless
+  ports:
+  - name: nginx-http
+    port: 80
+    targetPort: http
+  - name: python-http
+    port: 8080
+    targetPort: python
