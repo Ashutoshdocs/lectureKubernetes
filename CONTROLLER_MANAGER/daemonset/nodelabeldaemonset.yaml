@@ -1,13 +1,13 @@
 #labels for the nodes
 
-kubectl label node worker1 role=worker
-kubectl label node worker2 role=worker
+#kubectl label node worker1 role=worker
+#kubectl label node worker2 role=worker
 
 #lverify labels
-kubectl get nodes --show-labels
+#kubectl get nodes --show-labels
 
 
-#apiVersion: apps/v1
+apiVersion: apps/v1
 kind: DaemonSet
 
 metadata:
