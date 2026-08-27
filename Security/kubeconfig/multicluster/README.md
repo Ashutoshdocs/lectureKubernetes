@@ -1,5 +1,15 @@
 # Kubernetes Multi-Cluster Kubeconfig / KubeContext Demo
 
+## Execution Location Legend
+
+- **LAPTOP** = your Windows/Linux/macOS machine where `kubectl` will manage both clusters.
+- **VM-1** = Azure VM-1, Kubernetes control-plane node.
+- **VM-2** = Azure VM-2, Kubernetes control-plane node.
+- **AZURE PORTAL / AZURE CLI** = Azure networking/NSG operation.
+
+**Rule of thumb:** certificate and Kubernetes server changes happen on the VM; `scp`, `kubectl --kubeconfig`, context switching, and merged kubeconfig operations happen on the laptop.
+
+
 ## Objective
 
 Manage two isolated one-node Kubernetes clusters running on two separate Azure VMs from the same laptop.
@@ -19,7 +29,11 @@ The laptop needs network access to TCP 6443 on each VM.
 
 # PART 1 — VM-1: Prepare Kubernetes API Server for Remote Access
 
+**RUN ON: Azure VM-1 (Kubernetes control-plane VM)**
+
 ## 1. SSH to VM-1
+
+**RUN ON: Laptop**
 
 ```bash
 ssh azure@<VM1_PUBLIC_IP>
@@ -27,11 +41,15 @@ ssh azure@<VM1_PUBLIC_IP>
 
 ## 2. Become root
 
+**RUN ON: Azure VM-1**
+
 ```bash
 sudo -i
 ```
 
 ## 3. Create the script
+
+**RUN ON: Azure VM-1**
 
 ```bash
 nano /root/remote-k8s-access.sh
@@ -152,11 +170,15 @@ Ctrl + X
 
 ## 4. Make executable
 
+**RUN ON: Azure VM-1**
+
 ```bash
 chmod +x /root/remote-k8s-access.sh
 ```
 
 ## 5. Run
+
+**RUN ON: Azure VM-1**
 
 ```bash
 /root/remote-k8s-access.sh
@@ -177,6 +199,8 @@ Enter:
 ---
 
 # PART 2 — VM-1: Verify Certificate
+
+**RUN ON: Azure VM-1**
 
 Check SAN:
 
@@ -212,6 +236,8 @@ kubectl get pods -A
 
 # PART 3 — Azure NSG
 
+**RUN ON: Azure Portal / Azure CLI (from Laptop or any machine with Azure access)**
+
 Allow TCP 6443 from your laptop's public IP.
 
 Recommended:
@@ -235,6 +261,8 @@ in a real environment.
 
 # PART 4 — Laptop: Test VM-1 API Server
 
+**RUN ON: Laptop**
+
 Linux/macOS:
 
 ```bash
@@ -256,6 +284,8 @@ TcpTestSucceeded : True
 ---
 
 # PART 5 — Laptop: Download VM-1 kubeconfig
+
+**RUN ON: Laptop**
 
 From your laptop:
 
@@ -286,6 +316,8 @@ cluster1.yaml
 
 # PART 6 — Laptop: Check VM-1 kubeconfig
 
+**RUN ON: Laptop**
+
 Linux/macOS:
 
 ```bash
@@ -310,6 +342,8 @@ It should NOT point to the private IP if the laptop cannot reach that private IP
 
 # PART 7 — Laptop: Test VM-1
 
+**RUN ON: Laptop**
+
 ```bash
 kubectl --kubeconfig=./cluster1.yaml get nodes
 ```
@@ -324,19 +358,21 @@ If both work, VM-1 is remotely accessible.
 
 # PART 8 — VM-2: Repeat the Process
 
-SSH to VM-2:
+**RUN ON: Laptop for SSH/SCP; Azure VM-2 for Kubernetes/script commands**
+
+SSH to VM-2 (**RUN ON: Laptop**):
 
 ```bash
 ssh azure@<VM2_PUBLIC_IP>
 ```
 
-Become root:
+Become root (**RUN ON: Azure VM-2**):
 
 ```bash
 sudo -i
 ```
 
-Create the same script:
+Create the same script (**RUN ON: Azure VM-2**):
 
 ```bash
 nano /root/remote-k8s-access.sh
@@ -344,31 +380,31 @@ nano /root/remote-k8s-access.sh
 
 Paste the same script from PART 1.
 
-Make executable:
+Make executable (**RUN ON: Azure VM-2**):
 
 ```bash
 chmod +x /root/remote-k8s-access.sh
 ```
 
-Run:
+Run (**RUN ON: Azure VM-2**):
 
 ```bash
 /root/remote-k8s-access.sh
 ```
 
-When prompted, enter:
+When prompted, enter (**on VM-2**):
 
 ```text
 <VM2_PUBLIC_IP>
 ```
 
-Verify:
+Verify (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl get nodes
 ```
 
-Download from your laptop:
+Download from your laptop (**RUN ON: Laptop**):
 
 ```bash
 scp azure@<VM2_PUBLIC_IP>:/home/azure/admin.conf ./cluster2.yaml
@@ -385,6 +421,8 @@ kube-demo/
 ---
 
 # PART 9 — Test Both Configurations Independently
+
+**RUN ON: Laptop**
 
 Test Cluster 1:
 
@@ -408,6 +446,8 @@ kubectl --kubeconfig=./cluster2.yaml get pods -A
 ---
 
 # PART 10 — Rename Context in Cluster 1
+
+**RUN ON: Laptop**
 
 Check current context:
 
@@ -436,7 +476,7 @@ kubernetes-admin@kubernetes \
 cluster1
 ```
 
-Verify:
+Verify (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl --kubeconfig=./cluster1.yaml config get-contexts
@@ -445,6 +485,8 @@ kubectl --kubeconfig=./cluster1.yaml config get-contexts
 ---
 
 # PART 11 — Rename Context in Cluster 2
+
+**RUN ON: Laptop**
 
 List:
 
@@ -461,7 +503,7 @@ kubernetes-admin@kubernetes \
 cluster2
 ```
 
-Verify:
+Verify (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl --kubeconfig=./cluster2.yaml config get-contexts
@@ -470,6 +512,8 @@ kubectl --kubeconfig=./cluster2.yaml config get-contexts
 ---
 
 # PART 12 — Recommended: Rename Cluster Entries Too
+
+**RUN ON: Laptop**
 
 This avoids confusing duplicate cluster names when merging.
 
@@ -491,7 +535,7 @@ kubernetes \
 cluster2
 ```
 
-Verify:
+Verify (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl --kubeconfig=./cluster1.yaml config view
@@ -504,6 +548,8 @@ kubectl --kubeconfig=./cluster2.yaml config view
 ---
 
 # PART 13 — Merge Both Kubeconfigs
+
+**RUN ON: Laptop**
 
 ## Linux/macOS
 
@@ -543,6 +589,8 @@ kubectl config get-contexts
 
 # PART 14 — Test Context 1
 
+**RUN ON: Laptop**
+
 Switch:
 
 ```bash
@@ -576,6 +624,8 @@ kubectl get pods -A
 ---
 
 # PART 15 — Test Context 2
+
+**RUN ON: Laptop**
 
 Switch:
 
@@ -611,6 +661,8 @@ kubectl get pods -A
 
 # PART 16 — Strong Classroom Proof
 
+**RUN ON: Laptop**
+
 Create a unique namespace in Cluster 1:
 
 ```bash
@@ -618,7 +670,7 @@ kubectl config use-context cluster1
 kubectl create namespace cluster1-demo
 ```
 
-Verify:
+Verify (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl get namespaces
@@ -678,6 +730,8 @@ This proves the contexts point to two different Kubernetes clusters.
 
 # PART 17 — Create a Permanent Merged Config
 
+**RUN ON: Laptop**
+
 After testing:
 
 ```bash
@@ -702,6 +756,8 @@ CURRENT   NAME
 ---
 
 # PART 18 — Use merged-config.yaml
+
+**RUN ON: Laptop**
 
 Linux/macOS:
 
@@ -730,6 +786,8 @@ No `--kubeconfig` is required.
 
 # PART 19 — Final Context Demo
 
+**RUN ON: Laptop**
+
 Show current context:
 
 ```bash
@@ -742,7 +800,7 @@ Switch to Cluster 1:
 kubectl config use-context cluster1
 ```
 
-Run:
+Run (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl get nodes
@@ -755,7 +813,7 @@ Switch to Cluster 2:
 kubectl config use-context cluster2
 ```
 
-Run:
+Run (**RUN ON: Azure VM-2**):
 
 ```bash
 kubectl get nodes
@@ -765,6 +823,8 @@ kubectl get pods -A
 ---
 
 # PART 20 — Useful Kubeconfig Commands
+
+**RUN ON: Laptop**
 
 Show all contexts:
 
@@ -816,6 +876,8 @@ echo
 ---
 
 # PART 21 — Troubleshooting
+
+**RUN ON: Laptop unless explicitly marked VM**
 
 ## Check port 6443
 
