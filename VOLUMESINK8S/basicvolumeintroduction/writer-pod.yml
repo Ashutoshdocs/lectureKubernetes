@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: writer-pod
+spec:
+  containers:
+  - name: writer
+    image: busybox
+    command:
+      - sh
+      - -c
+      - |
+        while true
+        do
+          date >> /shared/data.txt
+          sleep 5
+        done
+    volumeMounts:
+    - name: shared-storage
+      mountPath: /shared
+
+  volumes:
+  - name: shared-storage
+    hostPath:
+      path: /data/shared

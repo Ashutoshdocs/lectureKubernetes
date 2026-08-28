@@ -1,0 +1,41 @@
+PRACTICAL02
+
+# Update (or create) ConfigMap "my-config" with new values using dry-run + apply
+# --dry-run=client prints YAML instead of creating directly; pipe to kubectl apply to update in-place
+kubectl create configmap my-config --from-literal=APP_COLOR=red --from-literal=APP_MODE=staging -o yaml --dry-run=client | kubectl apply -f -
+
+# Update (or create) Secret "my-secret" with new values
+kubectl create secret generic my-secret --from-literal=DB_USER=root --from-literal=DB_PASS=New@123 -o yaml --dry-run=client | kubectl apply -f -
+
+# Create another ConfigMap "web-config" with additional app settings
+kubectl create configmap web-config --from-literal=theme=dark --from-literal=title="My Web App"
+
+# Create another Secret "db-secret" with DB credentials
+kubectl create secret generic db-secret --from-literal=username=admin --from-literal=password=Pass@123
+
+# List files inside the /etc/config directory inside the pod "mount-demo"
+# This directory is where the ConfigMap "web-config" is mounted
+kubectl exec -it mount-demo -- ls /etc/config
+
+# Display the content of "theme" file (key from ConfigMap)
+kubectl exec -it mount-demo -- cat /etc/config/theme
+
+# List files in /etc/secret directory inside the same pod (mounted from the Secret)
+kubectl exec -it mount-demo -- ls /etc/secret
+
+# Display the username stored in Secret
+kubectl exec -it mount-demo -- cat /etc/secret/username
+
+# Edit ConfigMap "web-config" (for example, change theme from dark → light)
+kubectl edit configmap web-config
+
+# Verify if the new theme value is reflected inside the running pod
+# (ConfigMap updates are not automatically synced unless the pod restarts or uses projected volumes)
+kubectl exec -it mount-demo -- cat /etc/config/theme
+
+# Update the Secret "db-secret" using dry-run + apply (non-disruptive way)
+kubectl create secret generic db-secret --from-literal=username=root --from-literal=password=New@456 -o yaml --dry-run=client | kubectl apply -f -
+
+# Check if the updated secret value appears inside the pod
+# (Secrets mounted as volumes usually update automatically after a short delay)
+kubectl exec -it mount-demo -- cat /etc/secret/username

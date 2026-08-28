@@ -1,0 +1,6 @@
+curl -skSL https://raw.githubusercontent.com/kubernetes-sigs/azurefile-csi-driver/master/deploy/install-driver.sh | bash
+kubectl get pods -A | grep csi
+kubectl taint nodes master node-role.kubernetes.io/control-plane:NoSchedule-
+kubectl exec -it nginx-storage -- bash
+echo "Hello Azure File Share" > /usr/share/nginx/html/index.html
+kubectl cordon worker

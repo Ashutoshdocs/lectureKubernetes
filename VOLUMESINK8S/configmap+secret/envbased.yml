@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: env-demo-rs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: env-demo
+  template:
+    metadata:
+      labels:
+        app: env-demo
+    spec:
+      containers:
+      - name: demo-container
+        image: nginx
+        env:
+        - name: COLOR
+          valueFrom:
+            configMapKeyRef:
+              name: my-config
+              key: APP_COLOR
+
+        - name: MODE
+          valueFrom:
+            configMapKeyRef:
+              name: my-config
+              key: APP_MODE
+
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: my-secret
+              key: DB_USER
+
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: my-secret
+              key: DB_PASS

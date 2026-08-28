@@ -1,0 +1,14 @@
+# Dynamic provisioning:
+# The managed-csi StorageClass provisions an Azure managed disk automatically
+# when this claim is created. No PersistentVolume needs to be created by hand.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dynamic-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi
+  resources:
+    requests:
+      storage: 8Gi

@@ -1,0 +1,24 @@
+# Static provisioning:
+# This PV points at an Azure managed disk you create yourself (see
+# scripts/02-static-disk-setup.ps1). You must paste the disk's resource ID
+# into volumeHandle below.
+#
+# storageClassName: "" is important. It stops the default StorageClass from
+# dynamically provisioning a new disk, so the claim binds to THIS volume.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: azure-pv
+spec:
+  capacity:
+    storage: 4Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  csi:
+    driver: disk.csi.azure.com
+    # Replace with the output of:
+    #   az disk show -g aks-demo-rg -n demoDisk --query id -o tsv
+    volumeHandle: /subscriptions/<SUB_ID>/resourceGroups/aks-demo-rg/providers/Microsoft.Compute/disks/demoDisk
+    fsType: ext4

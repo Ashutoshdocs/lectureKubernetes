@@ -1,0 +1,13 @@
+volumes:
+- name: shared-storage
+  hostPath:
+    path: /data/shared
+    type: Directory
+
+| Type                | Meaning                      |
+| ------------------- | ---------------------------- |
+| `""`                | no strict check              |
+| `Directory`         | directory must already exist |
+| `DirectoryOrCreate` | create if missing            |
+| `File`              | file must exist              |
+| `FileOrCreate`      | create file if missing       |

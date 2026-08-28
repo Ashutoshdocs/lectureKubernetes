@@ -1,0 +1,24 @@
+PRACTICAL01
+
+# Create a ConfigMap named "my-config" with two key-value pairs
+kubectl create configmap my-config --from-literal=APP_COLOR=blue --from-literal=APP_MODE=production
+
+# View the created ConfigMap in YAML format (to verify data)
+kubectl get configmap my-config -o yaml
+
+# Create a Secret named "my-secret" with sensitive key-value pairs
+kubectl create secret generic my-secret --from-literal=DB_USER=admin --from-literal=DB_PASS=Pass@123
+
+# View the created Secret in YAML format (data will be base64 encoded)
+kubectl get secret my-secret -o yaml
+
+# Apply a YAML file (usually defines a Pod/Deployment using the ConfigMap & Secret)
+kubectl apply -f yamlfile
+
+# Check the environment variables inside the running pod named "env-demo"
+# Filter only those containing COLOR, MODE, or DB
+kubectl exec -it <podname> -- env | grep -E 'COLOR|MODE|DB'
+
+#Update configmap and Secret
+kubectl create configmap my-config --from-literal=APP_COLOR=red --from-literal=APP_MODE=staging -o yaml --dry-run=client | kubectl apply -f -
+kubectl create secret generic my-secret --from-literal=DB_USER=root --from-literal=DB_PASS=New@123 -o yaml --dry-run=client | kubectl apply -f -

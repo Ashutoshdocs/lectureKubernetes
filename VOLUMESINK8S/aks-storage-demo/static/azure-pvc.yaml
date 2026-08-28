@@ -1,0 +1,15 @@
+# Binds to the pre-created azure-pv (static provisioning).
+# storageClassName: "" must match the PV so no dynamic disk is created.
+# A 2Gi request is fine against a 4Gi PV — it binds to the larger volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: azure-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: azure-pv
+  resources:
+    requests:
+      storage: 2Gi

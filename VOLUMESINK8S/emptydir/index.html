@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes EmptyDir Demo</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            padding: 50px;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.10);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        h1 span {
+            color: #60a5fa;
+        }
+
+        .subtitle {
+            font-size: 19px;
+            color: #cbd5e1;
+            line-height: 1.7;
+            margin-bottom: 40px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            padding: 25px;
+            border-radius: 18px;
+            background: rgba(15,23,42,0.65);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .card-icon {
+            font-size: 35px;
+            margin-bottom: 15px;
+        }
+
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #93c5fd;
+        }
+
+        .card p {
+            color: #cbd5e1;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .flow {
+            margin-top: 35px;
+            padding: 20px;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.25);
+            font-family: monospace;
+            color: #bfdbfe;
+            font-size: 15px;
+        }
+
+        .footer {
+            margin-top: 25px;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        @media(max-width: 700px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 35px;
+            }
+
+            .container {
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="logo">☸️</div>
+
+    <h1>
+        Kubernetes <span>EmptyDir</span>
+    </h1>
+
+    <p class="subtitle">
+        This webpage is stored inside an EmptyDir volume
+        and served by an NGINX container.
+    </p>
+
+    <div class="cards">
+
+        <div class="card">
+            <div class="card-icon">📄</div>
+            <h2>index.html</h2>
+            <p>
+                The webpage is created outside the container
+                and copied into the Pod.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-icon">💾</div>
+            <h2>EmptyDir</h2>
+            <p>
+                EmptyDir provides temporary shared storage
+                for containers inside the Pod.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-icon">🌐</div>
+            <h2>NGINX</h2>
+            <p>
+                NGINX reads index.html from
+                /usr/share/nginx/html.
+            </p>
+        </div>
+
+    </div>
+
+    <div class="flow">
+        index.html → EmptyDir → NGINX → NodePort :30080
+    </div>
+
+    <div class="footer">
+        Kubernetes Volume Demonstration
+    </div>
+
+</div>
+
+</body>
+</html>

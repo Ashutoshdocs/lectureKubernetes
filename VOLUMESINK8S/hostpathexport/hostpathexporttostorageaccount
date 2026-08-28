@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-blob-uploader
+
+spec:
+  containers:
+
+  - name: uploader
+    image: mcr.microsoft.com/azure-cli
+
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /uploaded
+
+        while true
+        do
+          for file in /scratch/*
+          do
+            if [ -f "$file" ]; then
+
+              filename=$(basename "$file")
+
+              if [ ! -f "/uploaded/$filename" ]; then
+
+                echo "Uploading $filename"
+
+                az storage blob upload \
+                  --account-name YOUR_STORAGE_ACCOUNT \
+                  --account-key YOUR_ACCESS_KEY \
+                  --container-name YOUR_CONTAINER \
+                  --name $filename \
+                  --file $file \
+                  --overwrite
+
+                touch /uploaded/$filename
+
+                echo "$filename uploaded"
+              fi
+            fi
+          done
+
+          sleep 10
+        done
+
+    volumeMounts:
+
+    - name: host-storage
+      mountPath: /scratch
+
+    - name: uploaded-marker
+      mountPath: /uploaded
+
+
+  volumes:
+
+  - name: host-storage
+    hostPath:
+      path: /scratch
+      type: DirectoryOrCreate
+
+  - name: uploaded-marker
+    emptyDir: {}
