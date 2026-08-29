@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Kubernetes NGINX Dashboard</title>
+
+<style>
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0f172a;
+    color: #00ff88;
+    font-family: monospace;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    padding: 20px;
+}
+
+.container {
+    width: 100%;
+    max-width: 900px;
+}
+
+h1 {
+    text-align: center;
+    color: #4fc3f7;
+}
+
+.subtitle {
+    text-align: center;
+    color: #94a3b8;
+    margin-bottom: 20px;
+}
+
+.card {
+    background: #020617;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+
+    padding: 25px;
+
+    box-shadow:
+        0 15px 40px rgba(0,0,0,.5);
+
+    overflow-x: auto;
+}
+
+pre {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.ok {
+    color: #22c55e;
+    font-weight: bold;
+}
+
+.footer {
+    text-align: center;
+    color: #64748b;
+    margin-top: 15px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Kubernetes - NGINX Web Server</h1>
+
+<div class="subtitle">
+Deployment &bull; Rolling Update &bull; Pod Identity
+</div>
+
+<div class="card">
+
+<pre>
+==========================================================================
+
+                    KUBERNETES NGINX DASHBOARD
+                    Deployment & Rollout Demo
+
+==========================================================================
+
+APPLICATION INFORMATION
+--------------------------------------------------------------------------
+
+Application       : NGINX
+Platform          : Kubernetes
+Deployment        : nginx-demo
+Application Ver.  : APP_VERSION
+
+
+POD INFORMATION
+--------------------------------------------------------------------------
+
+Pod Name          : POD_NAME
+Pod Namespace     : NAMESPACE
+Pod IP            : POD_IP
+Node Name         : NODE_NAME
+
+
+SERVICE INFORMATION
+--------------------------------------------------------------------------
+
+Service           : nginx-demo-service
+Service Type      : NodePort
+Target Port       : 80
+Node Port         : 30080
+
+
+DEPLOYMENT STATUS
+--------------------------------------------------------------------------
+
+Status            : [OK] RUNNING
+Replicas          : 3
+Rollout           : [OK] SUCCESSFUL
+
+
+ACCESS
+--------------------------------------------------------------------------
+
+Browser           : http://NODE_IP:30080
+curl              : curl http://NODE_IP:30080
+
+
+==========================================================================
+
+[OK] NGINX container is running
+[OK] Pod managed by Kubernetes Deployment
+[OK] Traffic exposed through NodePort
+[OK] Pod identity injected using Downward API
+
+==========================================================================
+
+</pre>
+
+</div>
+
+<div class="footer">
+Kubernetes NGINX Dashboard
+</div>
+
+</div>
+
+</body>
+</html>

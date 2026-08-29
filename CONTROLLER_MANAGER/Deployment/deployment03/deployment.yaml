@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: nginx-demo
+
+spec:
+  replicas: 3
+
+  revisionHistoryLimit: 10
+
+  selector:
+    matchLabels:
+      app: nginx-demo
+
+  template:
+
+    metadata:
+      labels:
+        app: nginx-demo
+
+    spec:
+
+      containers:
+
+        - name: nginx
+
+          image: nginx:alpine
+
+          ports:
+
+            - containerPort: 80
+
+          env:
+
+            - name: POD_NAME
+
+              valueFrom:
+
+                fieldRef:
+                  fieldPath: metadata.name
+
+            - name: POD_IP
+
+              valueFrom:
+
+                fieldRef:
+                  fieldPath: status.podIP
+
+            - name: NODE_NAME
+
+              valueFrom:
+
+                fieldRef:
+
+                  fieldPath: spec.nodeName
+
+            - name: NAMESPACE
+
+              valueFrom:
+
+                fieldRef:
+
+                  fieldPath: metadata.namespace
+
+            - name: APP_VERSION
+
+              value: "v1"
+
+          command:
+
+            - /bin/sh
+
+            - -c
+
+          args:
+
+            - |
+              cp /config/index.html /usr/share/nginx/html/index.html
+              sed -i "s/POD_NAME/${POD_NAME}/g" /usr/share/nginx/html/index.html
+              sed -i "s/POD_IP/${POD_IP}/g" /usr/share/nginx/html/index.html
+              sed -i "s/NODE_NAME/${NODE_NAME}/g" /usr/share/nginx/html/index.html
+              sed -i "s/NAMESPACE/${NAMESPACE}/g" /usr/share/nginx/html/index.html
+              sed -i "s/APP_VERSION/${APP_VERSION}/g" /usr/share/nginx/html/index.html
+              nginx -g "daemon off;"
+
+          volumeMounts:
+
+            - name: html
+
+              mountPath: /config
+
+      volumes:
+
+        - name: html
+
+          configMap:
+
+            name: nginx-html
