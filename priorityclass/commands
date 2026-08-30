@@ -1,3 +1,0 @@
-kubectl get pod low-priority-pod -o yaml | grep priority
-kubectl get pod high-priority-pod -o yaml | grep priority
-kubectl get events --sort-by=.metadata.creationTimestamp

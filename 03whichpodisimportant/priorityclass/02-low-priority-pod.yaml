@@ -1,0 +1,28 @@
+# =============================================================================
+# Low-priority Pod
+# -----------------------------------------------------------------------------
+# A deliberately "hungry" Pod. Its large CPU request means that on a small
+# node it occupies most of the allocatable CPU, which sets the stage for the
+# high-priority Pod to preempt it later.
+#
+# Adjust the "cpu" value to match your node - see the README ("Sizing the
+# demo for your cluster"). The goal: one of these should nearly fill a node.
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: low-priority-pod
+  labels:
+    demo: priority-preemption
+spec:
+  # Reference the PriorityClass by name. The scheduler resolves this to the
+  # numeric value (1000) and stores it in spec.priority automatically.
+  priorityClassName: low-priority
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: "1500m"    # reserve 1.5 vCPU
+        limits:
+          cpu: "1500m"

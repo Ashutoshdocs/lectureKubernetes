@@ -1,0 +1,21 @@
+# =============================================================================
+# QoS class: BestEffort  (the least protected)
+# -----------------------------------------------------------------------------
+# A Pod is "BestEffort" when NO container sets ANY request or limit for CPU or
+# memory. It runs only on whatever capacity is left over, and it is the FIRST
+# thing the kubelet evicts when the node runs low on memory.
+#
+# Note there is simply no "resources:" block at all - that is what makes it
+# BestEffort. Adding even a single request or limit would make it Burstable.
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: besteffort-pod
+  labels:
+    demo: qos
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      # No resources: requests or limits -> BestEffort

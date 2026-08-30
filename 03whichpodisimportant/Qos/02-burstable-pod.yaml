@@ -1,0 +1,28 @@
+# =============================================================================
+# QoS class: Burstable  (the middle tier)
+# -----------------------------------------------------------------------------
+# A Pod is "Burstable" when it does NOT qualify as Guaranteed, but at least one
+# container has SOME request or limit set. The classic shape is
+# requests < limits: the Pod is guaranteed its requests and may "burst" up to
+# its limits if the node has spare capacity.
+#
+# Burstable Pods are evicted AFTER BestEffort but BEFORE Guaranteed. Among
+# Burstable Pods, the ones using the most memory ABOVE their request go first.
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: burstable-pod
+  labels:
+    demo: qos
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"    # reserved floor
+        limits:
+          cpu: "250m"
+          memory: "128Mi"   # request < limit  -> Burstable (not Guaranteed)

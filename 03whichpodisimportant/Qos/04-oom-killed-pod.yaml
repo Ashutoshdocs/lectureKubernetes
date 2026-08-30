@@ -1,0 +1,35 @@
+# =============================================================================
+# Demo: a memory LIMIT is a hard cap  (OOMKilled)
+# -----------------------------------------------------------------------------
+# This is a Guaranteed Pod (memory & CPU request == limit). It then tries to
+# allocate ~250Mi while its limit is 100Mi. The container is immediately
+# OOMKilled and restarted, over and over.
+#
+# Teaching point: being "Guaranteed" protects you from being evicted to make
+# room for OTHER Pods - it does NOT let you exceed your OWN limit. A container
+# that goes past its memory limit is killed regardless of QoS class.
+#
+# Watch it:
+#   kubectl apply -f 04-oom-killed-pod.yaml
+#   kubectl get pod oom-demo -w        # RESTARTS climbs; reason shows OOMKilled
+#   kubectl describe pod oom-demo | grep -A3 "Last State"
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oom-demo
+  labels:
+    demo: qos
+spec:
+  containers:
+    - name: memory-hog
+      image: polinux/stress          # small image built for stress-testing
+      command: ["stress"]
+      args: ["--vm", "1", "--vm-bytes", "250M", "--vm-hang", "1"]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "100Mi"
+        limits:
+          cpu: "100m"
+          memory: "100Mi"            # < the 250M it tries to grab -> OOMKilled

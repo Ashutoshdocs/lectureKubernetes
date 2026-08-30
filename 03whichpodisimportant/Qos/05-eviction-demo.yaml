@@ -1,0 +1,85 @@
+# =============================================================================
+# Demo: eviction ORDER under node memory pressure
+# -----------------------------------------------------------------------------
+# This file deploys three memory consumers, one of each QoS class, that all
+# grab a chunk of memory but stay within their own limits. To create genuine
+# node pressure you then scale up the BestEffort hog until the node crosses its
+# memory-eviction threshold. The kubelet reclaims memory by evicting Pods in
+# QoS order: BestEffort first, then Burstable, and Guaranteed last.
+#
+#   kubectl apply -f 05-eviction-demo.yaml
+#   kubectl get pods -l demo=qos-evict -o wide -w
+#   # In another terminal, pile on pressure:
+#   kubectl scale deployment/besteffort-hog --replicas=20   # raise until eviction fires
+#   kubectl get events --sort-by=.metadata.creationTimestamp | grep -i evict
+#
+# NOTE: node-pressure eviction depends on your node's memory size and the
+# kubelet's eviction thresholds, so exact numbers vary. The ORDER is the
+# lesson, not the specific replica count. If nothing evicts, add more replicas.
+# =============================================================================
+---
+# BestEffort: no requests/limits -> first to be evicted. Scale this to apply pressure.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: besteffort-hog
+  labels:
+    demo: qos-evict
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: besteffort-hog
+  template:
+    metadata:
+      labels:
+        app: besteffort-hog
+        demo: qos-evict
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: hog
+          image: polinux/stress
+          command: ["stress"]
+          args: ["--vm", "1", "--vm-bytes", "150M", "--vm-hang", "1"]
+          # No resources block -> BestEffort
+---
+# Burstable: has requests < limits -> evicted after BestEffort.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: burstable-victim
+  labels:
+    demo: qos-evict
+spec:
+  containers:
+    - name: hog
+      image: polinux/stress
+      command: ["stress"]
+      args: ["--vm", "1", "--vm-bytes", "120M", "--vm-hang", "1"]
+      resources:
+        requests:
+          memory: "64Mi"
+        limits:
+          memory: "200Mi"   # request < limit -> Burstable
+---
+# Guaranteed: request == limit -> evicted last (should survive the longest).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guaranteed-survivor
+  labels:
+    demo: qos-evict
+spec:
+  containers:
+    - name: hog
+      image: polinux/stress
+      command: ["stress"]
+      args: ["--vm", "1", "--vm-bytes", "120M", "--vm-hang", "1"]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "200Mi"
+        limits:
+          cpu: "100m"
+          memory: "200Mi"   # request == limit -> Guaranteed

@@ -1,0 +1,43 @@
+# =============================================================================
+# Low-priority filler Deployment  (the reliable way to demo preemption)
+# -----------------------------------------------------------------------------
+# The single-Pod demo only shows preemption if one Pod nearly fills your node,
+# which depends on the node's size. This Deployment removes that guesswork:
+# scale it up until the node is FULL, then create the high-priority Pod and
+# watch the scheduler evict just enough of these replicas to make room.
+#
+#   kubectl apply -f 04-filler-deployment.yaml
+#   kubectl scale deployment/low-priority-filler --replicas=8   # until Pending appears
+#   kubectl apply -f 03-high-priority-pod.yaml
+#   kubectl get pods -w
+#
+# Uses the tiny "pause" image so replicas start instantly and cost almost
+# nothing except the CPU they RESERVE via requests.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: low-priority-filler
+  labels:
+    demo: priority-preemption
+spec:
+  replicas: 1                          # scale this up; see comment above
+  selector:
+    matchLabels:
+      app: low-priority-filler
+  template:
+    metadata:
+      labels:
+        app: low-priority-filler
+        demo: priority-preemption
+    spec:
+      priorityClassName: low-priority
+      terminationGracePeriodSeconds: 0 # evict instantly for a snappy demo
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: "500m"              # each replica reserves 0.5 vCPU
+            limits:
+              cpu: "500m"

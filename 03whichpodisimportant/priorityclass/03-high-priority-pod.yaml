@@ -1,0 +1,27 @@
+# =============================================================================
+# High-priority Pod
+# -----------------------------------------------------------------------------
+# Same resource footprint as the low-priority Pod, but tagged high-priority.
+# When the cluster can't fit both, the scheduler will preempt (evict) the
+# low-priority Pod so THIS one can be placed.
+#
+# Watch it happen:
+#   kubectl get pods -w
+#   kubectl get events --sort-by=.metadata.creationTimestamp
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: high-priority-pod
+  labels:
+    demo: priority-preemption
+spec:
+  priorityClassName: high-priority
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: "1500m"
+        limits:
+          cpu: "1500m"

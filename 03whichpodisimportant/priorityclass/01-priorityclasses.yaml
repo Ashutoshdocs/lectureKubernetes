@@ -1,0 +1,52 @@
+# =============================================================================
+# PriorityClasses
+# -----------------------------------------------------------------------------
+# A PriorityClass is a CLUSTER-SCOPED object (it lives outside any namespace).
+# It maps a human-readable name to an integer "value". Pods reference the name
+# via spec.priorityClassName, and the scheduler copies the number into the
+# Pod's spec.priority field when the Pod is admitted.
+#
+# The scheduler uses that number for two things:
+#   1. Scheduling order  -> higher-value Pods are placed off the queue first.
+#   2. Preemption        -> a PENDING higher-priority Pod may EVICT running
+#                           lower-priority Pods to free the resources it needs.
+#
+# Apply:    kubectl apply -f 01-priorityclasses.yaml
+# Inspect:  kubectl get priorityclass
+# =============================================================================
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+# Any int32 from -2,147,483,648 up to 1,000,000,000 for user-defined classes.
+# Higher = more important. (Values above 1e9 are reserved for system Pods.)
+value: 1000
+# If true, Pods that DON'T name a PriorityClass inherit this value.
+# Only one PriorityClass in the cluster may set this to true.
+# We keep it false so only Pods that opt in are affected.
+globalDefault: false
+description: "Low priority - safe to evict when the cluster is under pressure."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 100000                        # 100x the low-priority value
+globalDefault: false
+# preemptionPolicy controls whether Pods in THIS class may evict others:
+#   PreemptLowerPriority (default) -> can preempt lower-priority Pods
+#   Never                          -> jumps the scheduling queue but never evicts
+preemptionPolicy: PreemptLowerPriority
+description: "High priority - may preempt lower-priority Pods to get scheduled."
+---
+# Bonus class to demonstrate the difference: same high value, but it will
+# NEVER evict a running Pod. It only gets to skip ahead in the queue.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority-no-preempt
+value: 100000
+globalDefault: false
+preemptionPolicy: Never
+description: "High queue priority but will NOT evict running Pods."

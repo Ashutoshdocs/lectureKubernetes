@@ -1,0 +1,32 @@
+# =============================================================================
+# QoS class: Guaranteed  (the most protected)
+# -----------------------------------------------------------------------------
+# You never SET the QoS class directly. The kubelet DERIVES it from how you
+# fill in requests/limits. A Pod is "Guaranteed" only when EVERY container:
+#   * has a memory request AND memory limit that are EQUAL, and
+#   * has a CPU    request AND CPU    limit that are EQUAL.
+# (If you set only limits, Kubernetes copies them into requests for you, which
+#  still counts as Guaranteed.)
+#
+# Guaranteed Pods are evicted LAST under node memory pressure.
+#
+# Check the derived class after applying:
+#   kubectl get pod guaranteed-pod -o jsonpath='{.status.qosClass}{"\n"}'
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guaranteed-pod
+  labels:
+    demo: qos
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "128Mi"
+        limits:
+          cpu: "250m"      # equal to request  -> required for Guaranteed
+          memory: "128Mi"  # equal to request  -> required for Guaranteed
