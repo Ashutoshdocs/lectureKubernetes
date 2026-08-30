@@ -1,0 +1,67 @@
+# =============================================================================
+# A Pod owned by a StatefulSet
+# -----------------------------------------------------------------------------
+# A StatefulSet gives each Pod a STABLE IDENTITY: a fixed ordinal name
+# (web-0, web-1, web-2), a stable network name via a headless Service, and its
+# OWN PersistentVolumeClaim that follows it around. Delete web-1 and it comes
+# back AS web-1 - same name, reattaching the same volume (data-web-1). This is
+# the big contrast with ReplicaSet/Deployment, where replacements get random
+# new names and no stable storage.
+#
+#   kubectl apply -f 06-statefulset.yaml
+#   kubectl get pods -l app=nginx-sts -o wide      # web-0, web-1, web-2 (in order)
+#   kubectl get pvc                                 # data-web-0/1/2
+#   kubectl delete pod web-1
+#   kubectl get pods -l app=nginx-sts -w            # returns AS web-1
+#   kubectl get pvc                                 # data-web-1 was REUSED, not remade
+#
+# Requires a default StorageClass (kind and minikube ship one called "standard").
+# =============================================================================
+---
+# Headless Service (clusterIP: None) - gives the Pods stable DNS names.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-sts
+  labels:
+    app: nginx-sts
+spec:
+  clusterIP: None
+  selector:
+    app: nginx-sts
+  ports:
+    - port: 80
+      name: web
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  serviceName: nginx-sts          # must reference the headless Service above
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-sts
+  template:
+    metadata:
+      labels:
+        app: nginx-sts
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+              name: web
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:           # each Pod gets its OWN PVC: data-web-0, -1, -2
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Mi

@@ -1,0 +1,40 @@
+# =============================================================================
+# A Pod owned by a DaemonSet
+# -----------------------------------------------------------------------------
+# A DaemonSet's goal is "exactly one Pod on every (matching) node" - it counts
+# NODES, not a replica number. Delete its Pod and the DaemonSet recreates it
+# ON THE SAME NODE, because that node still needs its one copy.
+#
+#   kubectl apply -f 05-daemonset.yaml
+#   kubectl get pods -l app=nginx-ds -o wide      # note the NODE column
+#   kubectl delete pod <the-pod>
+#   kubectl get pods -l app=nginx-ds -o wide -w   # new Pod, SAME node
+#
+# On multi-node clusters you'll see one Pod per node. On single-node
+# kind/minikube you'll see exactly one. If your only node is a tainted
+# control-plane node and the Pod stays unscheduled, uncomment the toleration.
+# =============================================================================
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nginx-ds
+  labels:
+    app: nginx-ds
+spec:
+  selector:
+    matchLabels:
+      app: nginx-ds
+  template:
+    metadata:
+      labels:
+        app: nginx-ds
+    spec:
+      # tolerations:                    # uncomment to run on a control-plane node
+      #   - key: node-role.kubernetes.io/control-plane
+      #     operator: Exists
+      #     effect: NoSchedule
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80

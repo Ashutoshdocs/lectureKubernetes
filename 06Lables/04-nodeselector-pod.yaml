@@ -1,0 +1,33 @@
+# =============================================================================
+# Labels also live on NODES - and steer scheduling
+# -----------------------------------------------------------------------------
+# Nodes carry labels just like Pods do (many are built in, e.g.
+# kubernetes.io/hostname, kubernetes.io/arch). A Pod's nodeSelector is the
+# simplest way to say "only schedule me on nodes whose labels match."
+#
+# First give a node a label of your own, then apply this Pod:
+#   kubectl get nodes --show-labels
+#   kubectl label nodes <node-name> disktype=ssd
+#   kubectl apply -f 04-nodeselector-pod.yaml
+#   kubectl get pod ssd-pod -o wide          # lands on the labelled node
+#
+# If NO node has disktype=ssd, the Pod stays Pending - a clear demonstration
+# that the label is doing the steering. (For richer rules - "prefer", "or",
+# ranges - graduate from nodeSelector to nodeAffinity.)
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ssd-pod
+  labels:
+    app: nginx
+    env: prod
+    tier: frontend
+spec:
+  nodeSelector:
+    disktype: ssd        # must match a label on some node
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80

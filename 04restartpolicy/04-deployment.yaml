@@ -1,0 +1,38 @@
+# =============================================================================
+# A Pod owned by a Deployment
+# -----------------------------------------------------------------------------
+# A Deployment doesn't manage Pods directly - it manages a ReplicaSet, which
+# manages the Pods. So when a Pod under a Deployment dies, it's actually the
+# ReplicaSet underneath that recreates it. Behaviour on Pod death is identical
+# to the bare ReplicaSet; the Deployment simply adds rollout/versioning on top.
+#
+#   kubectl apply -f 04-deployment.yaml
+#   kubectl get deploy,rs,pods -l app=nginx-deploy
+#   kubectl delete pod <one-of-them>
+#   kubectl get pods -l app=nginx-deploy -w        # replacement appears
+#
+# See the ownership chain:  Deployment -> ReplicaSet -> Pod
+#   kubectl get pod <name> -o jsonpath='{.metadata.ownerReferences[0].kind}{"\n"}'
+#   # -> ReplicaSet   (and that RS is owned by the Deployment)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+  labels:
+    app: nginx-deploy
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-deploy
+  template:
+    metadata:
+      labels:
+        app: nginx-deploy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80

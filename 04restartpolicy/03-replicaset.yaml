@@ -1,0 +1,39 @@
+# =============================================================================
+# A Pod owned by a ReplicaSet
+# -----------------------------------------------------------------------------
+# Now we switch mechanisms. A ReplicaSet doesn't restart CONTAINERS - it keeps
+# a target NUMBER of Pods alive. Delete one of its Pods and it creates a brand
+# new REPLACEMENT Pod (new name, new UID, possibly a different node) to get back
+# to 3. The old Pod is gone; it is not "restarted."
+#
+#   kubectl apply -f 03-replicaset.yaml
+#   kubectl get pods -l app=nginx-rs -o wide
+#   kubectl delete pod <one-of-them>
+#   kubectl get pods -l app=nginx-rs -o wide -w   # a NEW name appears instantly
+#
+# Note: a controller's pod template restartPolicy MUST be Always (the default).
+# Setting OnFailure/Never here is rejected by the API server - these controllers
+# are for long-running workloads. (Jobs are the opposite: OnFailure/Never only.)
+# =============================================================================
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-rs
+  labels:
+    app: nginx-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-rs
+  template:
+    metadata:
+      labels:
+        app: nginx-rs
+    spec:
+      # restartPolicy: Always is implied; other values are invalid here.
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80

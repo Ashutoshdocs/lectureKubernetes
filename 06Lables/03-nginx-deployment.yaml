@@ -1,0 +1,55 @@
+# =============================================================================
+# Controllers select Pods too - with a richer selector
+# -----------------------------------------------------------------------------
+# A Deployment (like ReplicaSet/DaemonSet/Job) owns the Pods that match its
+# spec.selector. Unlike a Service, its selector supports two forms that are
+# ANDed together:
+#
+#   matchLabels      -> equality map, same as a Service selector
+#   matchExpressions -> set-based rules: In, NotIn, Exists, DoesNotExist
+#
+# THE GOLDEN RULE: the Pod template's labels (spec.template.metadata.labels)
+# MUST satisfy the selector, or the API server rejects the Deployment. The
+# controller stamps those template labels onto every Pod it creates, which is
+# how it later finds them again.
+#
+# Also note: spec.selector is IMMUTABLE after creation - you can't re-point a
+# live Deployment at a different label set (delete & recreate instead).
+#
+#   kubectl apply -f 03-nginx-deployment.yaml
+#   kubectl get pods -l app=nginx,env=prod --show-labels
+#   kubectl get rs -l app=nginx
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-prod-deploy
+  labels:
+    app: nginx
+    env: prod
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      tier: frontend
+    matchExpressions:
+      - key: env
+        operator: In
+        values: ["prod"]
+  template:
+    metadata:
+      # These labels MUST match the selector above (app+tier via matchLabels,
+      # env via matchExpressions). Extra labels like version/track are fine.
+      labels:
+        app: nginx
+        tier: frontend
+        env: prod
+        version: "1.27"
+        track: stable
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80

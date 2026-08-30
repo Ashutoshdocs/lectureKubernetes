@@ -1,0 +1,77 @@
+# =============================================================================
+# Three Pods that share a consistent labelling scheme
+# -----------------------------------------------------------------------------
+# Labels are key/value pairs you attach to objects. On their own they do
+# NOTHING - they just sit there as metadata. Their power comes from SELECTORS
+# (the next files), which query objects by their labels.
+#
+# The scheme used here (read down each Pod):
+#   app     -> which application it is        (nginx / mysql)
+#   env     -> which environment              (prod / staging)
+#   tier    -> where it sits in the stack     (frontend / backend)
+#   version -> the running version            (matches the image tag)
+#   track   -> release channel                (stable / canary)
+#
+# Because all three Pods use the SAME keys, you can slice the set any way you
+# like: "everything in prod", "every frontend", "nginx but only prod", etc.
+#
+# See the labels after applying:
+#   kubectl get pods --show-labels
+#   kubectl get pods -L app -L env -L tier      # labels as columns
+# =============================================================================
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-prod
+  labels:
+    app: nginx
+    env: prod
+    tier: frontend
+    version: "1.27"     # quoted so YAML doesn't read it as a number
+    track: stable
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-staging
+  labels:
+    app: nginx
+    env: staging
+    tier: frontend
+    version: "1.27"
+    track: canary
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql-prod
+  labels:
+    app: mysql
+    env: prod
+    tier: backend
+    version: "8.0"
+spec:
+  containers:
+    - name: mysql
+      image: mysql:8.0
+      env:
+        # DEMO ONLY. Never hardcode a password in a manifest - use a Secret.
+        # This lab is about labels, so we leave it inline to stay focused;
+        # see the README "Housekeeping" note.
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password123"
+      ports:
+        - containerPort: 3306

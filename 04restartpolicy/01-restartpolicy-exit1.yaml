@@ -1,0 +1,60 @@
+# =============================================================================
+# restartPolicy vs a FAILING container (exit code 1)
+# -----------------------------------------------------------------------------
+# restartPolicy is a POD-level field that tells the KUBELET how to restart the
+# CONTAINERS inside this pod, IN PLACE, on the same node. It never creates a new
+# pod. Values:
+#   Always     -> restart the container no matter how it exits (0 or non-zero)
+#   OnFailure  -> restart only if it exits NON-zero (a failure)
+#   Never      -> never restart the container
+#
+# All three pods below run the SAME command that exits with code 1 (failure).
+# Apply them together and compare:
+#
+#   kubectl apply -f 01-restartpolicy-exit1.yaml
+#   kubectl get pods -w -l demo=restart-exit1
+#
+# Expected:
+#   always-fail     -> RESTARTS climbs, then status CrashLoopBackOff
+#   onfailure-fail  -> RESTARTS climbs (non-zero exit qualifies)
+#   never-fail      -> RESTARTS stays 0, pod ends in status: Failed
+#
+# Inspect the last exit:
+#   kubectl describe pod never-fail | grep -A4 "Last State"
+# =============================================================================
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: always-fail
+  labels: { demo: restart-exit1 }
+spec:
+  restartPolicy: Always                 # the default if you omit it
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 5; echo 'exiting 1'; exit 1"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: onfailure-fail
+  labels: { demo: restart-exit1 }
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 5; echo 'exiting 1'; exit 1"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: never-fail
+  labels: { demo: restart-exit1 }
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 5; echo 'exiting 1'; exit 1"]

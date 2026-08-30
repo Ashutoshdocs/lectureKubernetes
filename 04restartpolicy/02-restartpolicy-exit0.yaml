@@ -1,0 +1,56 @@
+# =============================================================================
+# restartPolicy vs a SUCCEEDING container (exit code 0)
+# -----------------------------------------------------------------------------
+# The Always-vs-OnFailure difference ONLY shows up on a SUCCESSFUL exit. These
+# three pods run a command that exits 0. Apply and compare:
+#
+#   kubectl apply -f 02-restartpolicy-exit0.yaml
+#   kubectl get pods -w -l demo=restart-exit0
+#
+# Expected:
+#   always-ok     -> restarted anyway! RESTARTS climbs even though it succeeded
+#   onfailure-ok  -> NOT restarted; pod ends in status: Completed (Succeeded)
+#   never-ok      -> NOT restarted; pod ends in status: Completed (Succeeded)
+#
+# Put together with 01-*, this fills the whole matrix (see the README table):
+#             exit 0 (success)     exit 1 (failure)
+#   Always    restart              restart  (-> CrashLoopBackOff)
+#   OnFailure Completed            restart
+#   Never     Completed            Failed
+# =============================================================================
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: always-ok
+  labels: { demo: restart-exit0 }
+spec:
+  restartPolicy: Always
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 5; echo 'exiting 0'; exit 0"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: onfailure-ok
+  labels: { demo: restart-exit0 }
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 5; echo 'exiting 0'; exit 0"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: never-ok
+  labels: { demo: restart-exit0 }
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 5; echo 'exiting 0'; exit 0"]

@@ -1,0 +1,34 @@
+# =============================================================================
+# A Service finds its Pods with a label SELECTOR
+# -----------------------------------------------------------------------------
+# This is the real payoff of labels. A Service doesn't know Pod names - it
+# forwards traffic to whatever Pods currently match its spec.selector. Pods can
+# come and go; as long as their labels match, the Service tracks them.
+#
+# A Service selector is a simple map: every key/value must match (logical AND),
+# equality only (no "in", no "!=").
+#
+# THE TRAP: if this selector were just {app: nginx}, it would match BOTH
+# nginx-prod AND nginx-staging - production traffic would leak into staging!
+# Adding env: prod scopes it correctly. This is *why* environments belong in
+# labels, not just in the Pod name.
+#
+#   kubectl apply -f 02-nginx-service.yaml
+#   kubectl get endpoints nginx-prod-svc      # lists ONLY nginx-prod's IP
+#   kubectl describe service nginx-prod-svc
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-prod-svc
+  labels:
+    app: nginx
+    env: prod
+spec:
+  selector:              # <-- picks Pods by their labels
+    app: nginx
+    env: prod            # remove this line and staging Pods get added too
+    tier: frontend
+  ports:
+    - port: 80           # the Service's own port
+      targetPort: 80     # the Pods' containerPort
