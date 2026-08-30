@@ -1,4 +1,0 @@
-kubectl run debug --image=curlimages/curl -it --rm -- sh
-
-inside pod -> nslookup serviceip
-             curl dns:portnumber

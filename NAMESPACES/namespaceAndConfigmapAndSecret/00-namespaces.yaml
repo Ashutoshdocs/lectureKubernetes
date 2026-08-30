@@ -1,0 +1,16 @@
+# =============================================================================
+# Namespaces (prerequisite)
+# -----------------------------------------------------------------------------
+# The rest of the lab is split across dev and prod, so create them first.
+#   kubectl apply -f 00-namespaces.yaml
+# =============================================================================
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod

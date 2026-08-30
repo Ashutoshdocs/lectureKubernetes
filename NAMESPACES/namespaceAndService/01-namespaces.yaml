@@ -1,0 +1,35 @@
+# =============================================================================
+# Namespaces
+# -----------------------------------------------------------------------------
+# A Namespace is a virtual cluster inside your physical cluster. It gives you a
+# scope in which resource NAMES must be unique - so "webapp" can exist in dev,
+# prod, AND default at the same time without colliding. Namespaces are the unit
+# Kubernetes uses to divide a cluster between teams/environments and to attach
+# quotas and access control (RBAC).
+#
+# Namespaces themselves are CLUSTER-scoped (they don't live inside another
+# namespace). Every cluster already ships with a few:
+#   default        - where your objects go if you don't pick a namespace
+#   kube-system    - the control-plane's own components
+#   kube-public    - world-readable cluster info
+#   kube-node-lease- node heartbeats
+#
+# Apply:   kubectl apply -f 01-namespaces.yaml
+# List:    kubectl get namespaces        (alias: kubectl get ns)
+# =============================================================================
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:                 # namespaces can carry labels like any other object
+    environment: dev
+    team: web
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    environment: prod
+    team: web

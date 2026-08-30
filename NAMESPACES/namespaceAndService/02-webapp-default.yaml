@@ -1,0 +1,43 @@
+# =============================================================================
+# webapp in the DEFAULT namespace
+# -----------------------------------------------------------------------------
+# Notice there is NO "namespace:" field here. An object without one is created
+# in your CURRENT context's namespace - which is "default" on a fresh cluster,
+# but could be something else if you've switched (see the README). Being
+# explicit avoids nasty surprises; we leave it out here only to demonstrate the
+# default behaviour.
+#
+# hashicorp/http-echo just serves a fixed string on port 5678, so each
+# namespace's copy returns a different message - handy for proving which one you
+# reached over DNS.
+#
+#   kubectl apply -f 02-webapp-default.yaml
+#   kubectl get pod,svc -l app=webapp            # (looks in "default")
+# =============================================================================
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  containers:
+    - name: webapp
+      image: hashicorp/http-echo
+      args: ["-text=Hello From DEFAULT"]
+      ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  # A Service only ever selects Pods in its OWN namespace. This selector will
+  # never accidentally match the "webapp" Pods in dev or prod.
+  selector:
+    app: webapp
+  ports:
+    - port: 5678
+      targetPort: 5678

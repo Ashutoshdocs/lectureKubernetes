@@ -1,0 +1,37 @@
+# =============================================================================
+# webapp in the DEV namespace
+# -----------------------------------------------------------------------------
+# Same object names as default and prod - no collision, because names are only
+# unique WITHIN a namespace. The only differences are the "namespace: dev" field
+# and the echo text.
+#
+#   kubectl apply -f 03-webapp-dev.yaml
+#   kubectl get pod,svc -n dev
+# =============================================================================
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  namespace: dev
+  labels:
+    app: webapp
+spec:
+  containers:
+    - name: webapp
+      image: hashicorp/http-echo
+      args: ["-text=Hello From DEV"]
+      ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: dev
+spec:
+  selector:
+    app: webapp
+  ports:
+    - port: 5678
+      targetPort: 5678

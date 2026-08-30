@@ -1,0 +1,41 @@
+# =============================================================================
+# DEV ConfigMaps
+# -----------------------------------------------------------------------------
+# A ConfigMap holds NON-confidential configuration as key/value pairs. There are
+# two shapes, and it pays to keep them in separate ConfigMaps:
+#
+#   * Scalar keys  -> injected as environment variables (mysql-config below).
+#                     Keys must be valid env-var names (letters, digits, _).
+#   * File content -> mounted as a file inside the container (mysql-cnf below).
+#                     The key becomes the FILENAME, the value its contents.
+#
+# Keeping "my.cnf" out of the env ConfigMap matters: if you bulk-import a
+# ConfigMap with envFrom and one key is "my.cnf", that key is silently skipped
+# (a dot isn't legal in an env-var name) and you get a confusing warning event.
+#
+#   kubectl apply -f 01-configmap-dev.yaml
+#   kubectl get configmap -n dev
+#   kubectl describe configmap mysql-config -n dev
+# =============================================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: dev
+data:                       # all valid env-var names -> safe for envFrom
+  MYSQL_DATABASE: devdb
+  MYSQL_USER: devuser
+  TZ: UTC
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-cnf
+  namespace: dev
+data:
+  # One key whose value is a whole file. Mounted at /etc/mysql/conf.d/my.cnf.
+  my.cnf: |
+    [mysqld]
+    max_connections=100
+    character-set-server=utf8mb4

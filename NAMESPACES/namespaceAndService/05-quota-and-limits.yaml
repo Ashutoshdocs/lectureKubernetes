@@ -1,0 +1,50 @@
+# =============================================================================
+# BONUS: per-namespace governance (ResourceQuota + LimitRange) on dev
+# -----------------------------------------------------------------------------
+# One of the main reasons namespaces exist: you can cap and shape resource use
+# per team/environment. These two objects only affect the "dev" namespace.
+#
+#   ResourceQuota - a hard ceiling for the whole namespace (total pods, total
+#                   CPU/memory requested and limited).
+#   LimitRange    - per-CONTAINER defaults, applied automatically to Pods that
+#                   don't set their own requests/limits.
+#
+# WHY THEY GO TOGETHER: once a ResourceQuota constrains requests/limits, every
+# new Pod in the namespace MUST declare them or it's REJECTED. The LimitRange
+# supplies sensible defaults so simple Pods (like our webapp, which sets none)
+# still get admitted. Apply the LimitRange first (or together), then recreate
+# the dev webapp and watch it inherit the defaults:
+#
+#   kubectl apply -f 05-quota-and-limits.yaml
+#   kubectl replace --force -f 03-webapp-dev.yaml
+#   kubectl get pod webapp -n dev -o jsonpath='{.spec.containers[0].resources}{"\n"}'
+#   kubectl describe resourcequota dev-quota -n dev     # see Used vs Hard
+# =============================================================================
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: dev-defaults
+  namespace: dev
+spec:
+  limits:
+    - type: Container
+      default:              # becomes the container's limits if unset
+        cpu: "250m"
+        memory: "256Mi"
+      defaultRequest:       # becomes the container's requests if unset
+        cpu: "100m"
+        memory: "128Mi"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dev-quota
+  namespace: dev
+spec:
+  hard:
+    pods: "10"
+    requests.cpu: "2"
+    requests.memory: "2Gi"
+    limits.cpu: "4"
+    limits.memory: "4Gi"

@@ -1,0 +1,77 @@
+# =============================================================================
+# DEV MySQL - shows EVERY way to consume config & secrets
+# -----------------------------------------------------------------------------
+# This one manifest deliberately uses three different injection styles so you
+# can see them side by side:
+#
+#   1. envFrom  -> bulk-import ALL keys of a ConfigMap as env vars
+#   2. env + valueFrom.secretKeyRef -> pull ONE key from a Secret into one env var
+#   3. volume mount -> project a ConfigMap key as a FILE on disk
+#
+# (A real database should be a StatefulSet with a PersistentVolume - see the
+# restart/lifecycle lab. We use a 1-replica Deployment here to keep the focus on
+# configuration.)
+#
+#   kubectl apply -f 03-mysql-dev.yaml
+#   kubectl exec -n dev deploy/mysql -- env | grep -E 'MYSQL|TZ'   # methods 1 & 2
+#   kubectl exec -n dev deploy/mysql -- cat /etc/mysql/conf.d/my.cnf  # method 3
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: dev
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          # ---- METHOD 1: bulk env vars from a ConfigMap --------------------
+          envFrom:
+            - configMapRef:
+                name: mysql-config          # -> MYSQL_DATABASE, MYSQL_USER, TZ
+          # ---- METHOD 2: single env vars pulled from a Secret --------------
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
+          # ---- METHOD 3: a ConfigMap key mounted as a file ----------------
+          volumeMounts:
+            - name: mysql-cnf
+              mountPath: /etc/mysql/conf.d     # my.cnf lands here
+              readOnly: true
+      volumes:
+        - name: mysql-cnf
+          configMap:
+            name: mysql-cnf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: dev
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306

@@ -1,0 +1,23 @@
+# =============================================================================
+# PROD ConfigMap - immutable
+# -----------------------------------------------------------------------------
+# Setting immutable: true locks the data. You then CANNOT edit it - any change
+# means delete and recreate. Two payoffs:
+#   * Safety: nobody can silently mutate prod config out from under running Pods.
+#   * Performance: the kubelet stops watching it for changes, easing API load at
+#     scale.
+# Try `kubectl edit configmap mysql-config -n prod` after applying - it's refused.
+#
+#   kubectl apply -f 04-configmap-prod.yaml
+# =============================================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: prod
+immutable: true
+data:
+  MYSQL_DATABASE: proddb
+  MYSQL_USER: produser
+  TZ: UTC

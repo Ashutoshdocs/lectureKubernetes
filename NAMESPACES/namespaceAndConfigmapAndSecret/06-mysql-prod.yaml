@@ -1,0 +1,78 @@
+# =============================================================================
+# PROD MySQL - the hardened pattern
+# -----------------------------------------------------------------------------
+# Differences from dev, and why:
+#
+#   * Secrets are mounted as FILES, not env vars. Env vars leak easily - they
+#     show up in `kubectl describe`, crash dumps, child-process environments, and
+#     careless logging. Files mounted from a Secret live on an in-memory tmpfs
+#     and are read only by the process that needs them.
+#   * We use the MySQL image's built-in "_FILE" convention: point
+#     MYSQL_ROOT_PASSWORD_FILE / MYSQL_PASSWORD_FILE at the mounted path and the
+#     entrypoint reads the password FROM the file.
+#   * ConfigMap and Secret are immutable (previous files).
+#   * Resource requests/limits are set (good hygiene; also required if the
+#     namespace has a ResourceQuota - see the namespaces lab).
+#
+#   kubectl apply -f 06-mysql-prod.yaml
+#   kubectl exec -n prod deploy/mysql -- ls -l /etc/mysql/secrets   # files, tmpfs
+#   kubectl exec -n prod deploy/mysql -- env | grep MYSQL           # only *_FILE paths
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: prod
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - configMapRef:
+                name: mysql-config          # MYSQL_DATABASE, MYSQL_USER, TZ
+          env:
+            # The password itself is NOT here - only the PATH to the file.
+            - name: MYSQL_ROOT_PASSWORD_FILE
+              value: /etc/mysql/secrets/root-password
+            - name: MYSQL_PASSWORD_FILE
+              value: /etc/mysql/secrets/app-password
+          volumeMounts:
+            - name: mysql-secrets
+              mountPath: /etc/mysql/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+      volumes:
+        - name: mysql-secrets
+          secret:
+            secretName: mysql-secret        # keys root-password, app-password -> files
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: prod
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
