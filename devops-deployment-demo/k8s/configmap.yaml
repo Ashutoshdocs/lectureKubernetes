@@ -1,0 +1,12 @@
+# Externalised configuration. Change values here without rebuilding the image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-demo-config
+  labels:
+    app: devops-demo
+data:
+  DEPLOY_MODE: "Kubernetes"
+  APP_VERSION: "1.0.0"
+  GREETING: "Hello from a Kubernetes pod!"
+  PORT: "8080"

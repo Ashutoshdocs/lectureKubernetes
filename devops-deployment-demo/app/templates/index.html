@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DevOps Deployment Demo</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      max-width: 640px; margin: 6vh auto; padding: 0 1.2rem; line-height: 1.5;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.2rem; }
+    .mode {
+      display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px;
+      background: #2563eb; color: #fff; font-size: 0.8rem; font-weight: 600;
+      letter-spacing: 0.03em; text-transform: uppercase;
+    }
+    table { border-collapse: collapse; width: 100%; margin-top: 1.4rem; }
+    td { padding: 0.55rem 0.4rem; border-bottom: 1px solid #8883; vertical-align: top; }
+    td:first-child { font-weight: 600; width: 45%; color: #6b7280; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .hint { margin-top: 1.6rem; font-size: 0.85rem; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <h1>{{ greeting }}</h1>
+  <span class="mode">{{ deploy_mode }}</span>
+
+  <table>
+    <tr><td>Hostname</td><td><code>{{ hostname }}</code></td></tr>
+    <tr><td>Deploy mode</td><td><code>{{ deploy_mode }}</code></td></tr>
+    <tr><td>Version</td><td><code>{{ version }}</code></td></tr>
+    <tr><td>Process ID</td><td><code>{{ pid }}</code></td></tr>
+    <tr><td>Visits since start</td><td><code>{{ visits_since_start }}</code></td></tr>
+  </table>
+
+  <p class="hint">
+    Refresh the page. On a <strong>VM</strong> the hostname stays the same.
+    In <strong>Docker</strong> it's the container id. In <strong>Kubernetes</strong>
+    (scaled to several pods) the hostname will change between refreshes as the
+    Service load-balances your requests. JSON version at <code>/api/info</code>.
+  </p>
+</body>
+</html>

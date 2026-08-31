@@ -1,0 +1,17 @@
+# Convenience wrapper so you can run the whole thing with one command:
+#   cd docker && docker compose up --build
+#
+# Note: build context is the project root (..) because the Dockerfile
+# copies from the app/ directory.
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: devops-demo:1.0.0
+    ports:
+      - "8080:8080"
+    environment:
+      DEPLOY_MODE: "Docker Compose"
+      GREETING: "Hello from Docker Compose!"
+    restart: unless-stopped
