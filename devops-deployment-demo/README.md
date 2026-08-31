@@ -123,6 +123,8 @@ Docker installed (`docker --version`).
 
    ```bash
    docker build -t devops-demo:1.0.0 -f docker/Dockerfile .
+   docker save devops-demo:1.0.0 -o devops-demo:1.0.0.tar
+  sudo ctr -n=k8s.io images import devops-demo:1.0.0.tar 
    ```
 
 2. Run a container:
