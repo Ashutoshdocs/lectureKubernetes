@@ -57,6 +57,7 @@ on the page tells you which method you're looking at.
 ### Run it locally (no infra)
 
 ```bash
+apt install python3.12-venv
 cd app
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
