@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RPS-9000 // Rock Paper Scissors</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <main class="cabinet">
+    <header class="marquee">
+      <h1>ROCK&middot;PAPER&middot;SCISSORS</h1>
+      <p class="sub">best the machine &mdash; running on Kubernetes</p>
+    </header>
+
+    <section class="stats" id="stats" aria-live="polite">
+      <div class="stat"><span class="k" id="stat-rounds">--</span><span class="l">rounds played</span></div>
+      <div class="stat"><span class="k" id="stat-players">--</span><span class="l">players</span></div>
+      <div class="stat"><span class="k" id="stat-champ">--</span><span class="l">champion</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Your handle</h2>
+      <div class="handle">
+        <input id="name" maxlength="20" placeholder="e.g. NEO" autocomplete="off" />
+        <span class="hint" id="session">Pick a name, then throw.</span>
+      </div>
+    </section>
+
+    <section class="panel arena">
+      <h2>Throw</h2>
+      <div class="moves">
+        <button class="move" data-move="rock"     aria-label="rock">&#129704;</button>
+        <button class="move" data-move="paper"    aria-label="paper">&#128196;</button>
+        <button class="move" data-move="scissors" aria-label="scissors">&#9986;&#65039;</button>
+      </div>
+
+      <div class="versus" id="versus">
+        <div class="side"><span class="emoji" id="you-emoji">&#10067;</span><span class="who">you</span></div>
+        <div class="verdict" id="verdict">throw to play</div>
+        <div class="side"><span class="emoji" id="cpu-emoji">&#10067;</span><span class="who">cpu</span></div>
+      </div>
+
+      <p class="msg" id="msg"></p>
+    </section>
+
+    <section class="panel">
+      <div class="board-head">
+        <h2>Top scorers</h2>
+        <div class="search">
+          <input id="query" placeholder="find a player" autocomplete="off" />
+          <button id="clear" class="ghost">Show all</button>
+        </div>
+      </div>
+      <ol class="board" id="board"><li class="empty">Loading&hellip;</li></ol>
+    </section>
+
+    <footer class="foot">
+      <span>scores live in MySQL &middot; served through a NodePort &middot; points = win&times;3 + draw</span>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
