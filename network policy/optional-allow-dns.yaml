@@ -1,0 +1,46 @@
+# =============================================================================
+# OPTIONAL — Allow DNS
+# -----------------------------------------------------------------------------
+# The core demo curls by POD IP, which needs no DNS. But the moment you try to
+# curl by NAME (a Service, another pod's hostname, or google.com) it will HANG,
+# because `default-deny` blocks egress to CoreDNS on port 53.
+#
+# This policy re-opens ONLY UDP/TCP port 53, and ONLY for pod-a and pod-b
+# (the pods that initiate connections). pod-c is deliberately left with zero
+# egress so it stays true to "pod-c may send to no one".
+#
+# Apply it only if you want name resolution:
+#   kubectl apply -f optional-allow-dns.yaml
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values: ["pod-a", "pod-b"]
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    # Leaving `to:` out means "to any destination on port 53". To tighten it
+    # to CoreDNS only, replace the block above with:
+    #
+    # - to:
+    #   - namespaceSelector: {}
+    #     podSelector:
+    #       matchLabels:
+    #         k8s-app: kube-dns
+    #   ports:
+    #   - protocol: UDP
+    #     port: 53
+    #   - protocol: TCP
+    #     port: 53

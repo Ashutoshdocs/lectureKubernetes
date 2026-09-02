@@ -1,0 +1,78 @@
+# =============================================================================
+# NetworkPolicy Demo — Pods
+# -----------------------------------------------------------------------------
+# Three nginx pods. Each one:
+#   * serves HTTP on port 80  (so it can be a TARGET we curl)
+#   * has `curl` installed     (so it can be a CLIENT that curls others)
+#
+# curl is installed AT STARTUP, on purpose. At the moment these pods start,
+# no NetworkPolicy exists yet, so egress to the internet still works and apt
+# can fetch curl. Once you apply the deny policies, apt would no longer work —
+# which is itself a lesson. So: always apply pods.yaml BEFORE the policies.
+#
+# NOTE: `nodeName` is commented out so this works on any cluster. To run the
+# cross-node version (proving policies work between nodes), uncomment nodeName
+# and set real names from:  kubectl get nodes
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-a
+  namespace: netpol-demo
+  labels:
+    app: pod-a
+spec:
+  # nodeName: master        # <-- optional: pin to a specific node
+  containers:
+  - name: web
+    image: nginx:1.27
+    ports:
+    - containerPort: 80
+    command: ["/bin/bash", "-c"]
+    args:
+      - |
+        apt-get update -qq >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl >/dev/null 2>&1 || true
+        exec nginx -g 'daemon off;'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-b
+  namespace: netpol-demo
+  labels:
+    app: pod-b
+spec:
+  # nodeName: worker
+  containers:
+  - name: web
+    image: nginx:1.27
+    ports:
+    - containerPort: 80
+    command: ["/bin/bash", "-c"]
+    args:
+      - |
+        apt-get update -qq >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl >/dev/null 2>&1 || true
+        exec nginx -g 'daemon off;'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-c
+  namespace: netpol-demo
+  labels:
+    app: pod-c
+spec:
+  # nodeName: worker
+  containers:
+  - name: web
+    image: nginx:1.27
+    ports:
+    - containerPort: 80
+    command: ["/bin/bash", "-c"]
+    args:
+      - |
+        apt-get update -qq >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl >/dev/null 2>&1 || true
+        exec nginx -g 'daemon off;'

@@ -1,0 +1,121 @@
+# =============================================================================
+# NetworkPolicy Demo — Policies
+# -----------------------------------------------------------------------------
+# Goal (the "rules of the game"):
+#
+#   pod-a : may SEND only to pod-c        | may RECEIVE from no one
+#   pod-b : may SEND to anyone            | may RECEIVE from anyone
+#   pod-c : may SEND to no one            | may RECEIVE only from pod-a & pod-b
+#
+# Golden rule of NetworkPolicy:
+#   A connection succeeds ONLY IF the SENDER's egress allows the destination
+#   AND the RECEIVER's ingress allows the source. Both sides must agree.
+#
+# Reminder on empty vs missing rules (this trips everyone up):
+#   ingress: []      -> a policy with NO ingress rules  -> DENY all ingress
+#   ingress: [ {} ]  -> one rule that matches everything -> ALLOW all ingress
+#   (same logic applies to egress)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. DEFAULT DENY
+# Selects every pod in the namespace (podSelector: {}) and declares both
+# directions "managed". With no rules listed, this denies ALL ingress and ALL
+# egress. Every allowance below is added on top of this baseline.
+# NetworkPolicies are ADDITIVE (a union) — they can only ever ALLOW more,
+# never subtract from another policy.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: netpol-demo
+spec:
+  podSelector: {}            # {} = all pods in this namespace
+  policyTypes:
+  - Ingress
+  - Egress
+  # no ingress: / egress: keys => deny both directions
+---
+# -----------------------------------------------------------------------------
+# 2. POD-A POLICY
+# SEND only to pod-c, RECEIVE from no one.
+#   ingress: []  -> deny all inbound (pod-a is unreachable)
+#   egress       -> allow outbound only to pods labelled app=pod-c
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-a-policy
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-a
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []                # DENY all inbound
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: pod-c         # ALLOW outbound to pod-c only
+---
+# -----------------------------------------------------------------------------
+# 3. POD-B POLICY
+# SEND to anyone, RECEIVE from anyone.
+#   ingress: [ {} ] and egress: [ {} ] each contain one "match everything" rule.
+# Note: "send to anyone" only means pod-b's OWN egress is open. Whether the
+# packet is actually delivered still depends on the TARGET's ingress rules.
+# (e.g. pod-b -> pod-a is dropped because pod-a denies all ingress.)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-b-policy
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-b
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}                       # ALLOW all inbound
+  egress:
+  - {}                       # ALLOW all outbound
+---
+# -----------------------------------------------------------------------------
+# 4. POD-C POLICY
+# SEND to no one, RECEIVE only from pod-a and pod-b.
+#   ingress -> two peers in ONE list = OR (from pod-a OR from pod-b)
+#   egress: []  -> deny all outbound
+#
+# Subtle but important: even though pod-c has NO egress, when pod-a curls pod-c
+# the REPLY still gets back to pod-a. NetworkPolicy is stateful — return traffic
+# on an already-allowed connection is permitted automatically (conntrack).
+# egress rules only govern connections pod-c *initiates*.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-c-policy
+  namespace: netpol-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: pod-c
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: pod-a         # allow from pod-a
+    - podSelector:
+        matchLabels:
+          app: pod-b         # OR from pod-b
+  egress: []                 # DENY all outbound
