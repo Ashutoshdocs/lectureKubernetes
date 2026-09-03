@@ -1,14 +1,15 @@
-﻿apiVersion: v1
+apiVersion: v1
 kind: Service
 metadata:
   name: memory-hpa-svc
+  namespace: hpa-demo
+  labels:
+    app: memory-hpa
 spec:
   type: ClusterIP
-
   selector:
     app: memory-hpa
-
   ports:
-
-  - port: 80
+  - name: http
+    port: 80
     targetPort: 8080

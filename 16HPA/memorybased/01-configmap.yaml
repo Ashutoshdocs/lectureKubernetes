@@ -1,52 +1,103 @@
-﻿apiVersion: v1
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: memory-app-code
+  namespace: hpa-demo
+  labels:
+    app: memory-hpa
 data:
   app.py: |
-    from http.server import BaseHTTPRequestHandler, HTTPServer
+    #!/usr/bin/env python3
+    """
+    Memory HPA demo app.
 
-    memory_store = []
+    Endpoints
+      GET /         -> hello / usage
+      GET /load     -> allocate CHUNK_MB, held for TTL_SECONDS then auto-freed
+      GET /clear    -> free everything now
+      GET /status   -> current live MiB, chunk count, config
+      GET /healthz  -> liveness/readiness probe
+
+    Key idea vs a naive demo:
+      * Memory allocated by /load DECAYS after TTL_SECONDS, so when load
+        stops the pod's RSS drops and the HPA can scale DOWN. A demo that
+        only ever grows memory can never scale back in.
+      * A MAX_MB ceiling stops the pod from ever hitting its container
+        memory limit and getting OOMKilled, so autoscaling stays smooth.
+    """
+    import os
+    import time
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    CHUNK_MB     = int(os.environ.get("CHUNK_MB", "5"))
+    TTL_SECONDS  = int(os.environ.get("TTL_SECONDS", "60"))
+    MAX_MB       = int(os.environ.get("MAX_MB", "200"))
+    PORT         = int(os.environ.get("PORT", "8080"))
+
+    _lock = threading.Lock()
+    _chunks = []  # list of (expiry_epoch, bytearray)
+
+    def _live_mb():
+        return sum(len(b) for _, b in _chunks) // (1024 * 1024)
+
+    def _reaper():
+        # Frees expired chunks once per second -> memory decays after TTL.
+        while True:
+            now = time.time()
+            with _lock:
+                _chunks[:] = [(exp, buf) for exp, buf in _chunks if exp > now]
+            time.sleep(1)
 
     class Handler(BaseHTTPRequestHandler):
+        def _reply(self, code, text):
+            body = text.encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def do_GET(self):
+            path = self.path.split("?", 1)[0]
 
-            if self.path == "/":
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b"Memory HPA Demo")
+            if path == "/":
+                self._reply(200, "Memory HPA demo. Try /load /clear /status /healthz\n")
 
-            elif self.path == "/load":
+            elif path == "/load":
+                with _lock:
+                    if _live_mb() + CHUNK_MB > MAX_MB:
+                        self._reply(429, f"ceiling {MAX_MB} MiB reached; holding steady\n")
+                        return
+                    # bytearray is zero-filled by CPython, so pages are dirtied
+                    # and actually count toward RSS (not just virtual memory).
+                    _chunks.append((time.time() + TTL_SECONDS,
+                                    bytearray(CHUNK_MB * 1024 * 1024)))
+                    live = _live_mb()
+                self._reply(200, f"allocated {CHUNK_MB} MiB (ttl {TTL_SECONDS}s); live ~{live} MiB\n")
 
-                # Allocate approximately 5 MiB
-                data = bytearray(5 * 1024 * 1024)
+            elif path == "/clear":
+                with _lock:
+                    _chunks.clear()
+                self._reply(200, "memory cleared\n")
 
-                # Keep the memory referenced
-                memory_store.append(data)
+            elif path == "/status":
+                with _lock:
+                    self._reply(200,
+                        f"live_mb={_live_mb()} chunks={len(_chunks)} "
+                        f"chunk_mb={CHUNK_MB} ttl_s={TTL_SECONDS} max_mb={MAX_MB}\n")
 
-                current_mb = len(memory_store) * 5
-
-                self.send_response(200)
-                self.end_headers()
-
-                message = f"Allocated approximately {current_mb} MiB\n"
-                self.wfile.write(message.encode())
-
-            elif self.path == "/clear":
-
-                memory_store.clear()
-
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b"Memory cleared\n")
+            elif path == "/healthz":
+                self._reply(200, "ok\n")
 
             else:
-                self.send_response(404)
-                self.end_headers()
+                self._reply(404, "not found\n")
 
-    server = HTTPServer(("0.0.0.0", 8080), Handler)
+        def log_message(self, *args):
+            pass  # keep pod logs quiet under load
 
-    print("Memory HPA application listening on port 8080")
-
-    server.serve_forever()
+    if __name__ == "__main__":
+        threading.Thread(target=_reaper, daemon=True).start()
+        print(f"listening on :{PORT}  chunk={CHUNK_MB}MiB ttl={TTL_SECONDS}s max={MAX_MB}MiB",
+              flush=True)
+        ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

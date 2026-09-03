@@ -1,11 +1,11 @@
-﻿apiVersion: autoscaling/v2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
-
 metadata:
   name: memory-hpa
-
+  namespace: hpa-demo
+  labels:
+    app: memory-hpa
 spec:
-
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
@@ -15,14 +15,25 @@ spec:
   maxReplicas: 5
 
   metrics:
-
   - type: Resource
-
     resource:
-
       name: memory
-
       target:
-
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: 70   # of the pod's memory REQUEST (128Mi) -> ~90Mi
+
+  # Behavior makes the demo watchable: react fast on the way up,
+  # wait before scaling in so pods don't flap.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60

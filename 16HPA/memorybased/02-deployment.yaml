@@ -1,51 +1,64 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: memory-hpa
+  namespace: hpa-demo
+  labels:
+    app: memory-hpa
 spec:
   replicas: 1
-
   selector:
     matchLabels:
       app: memory-hpa
-
   template:
     metadata:
       labels:
         app: memory-hpa
-
     spec:
       containers:
-
       - name: memory-app
-
         image: python:3.12-alpine
-
-        command:
-        - python
-        - /app/app.py
-
+        command: ["python", "/app/app.py"]
         ports:
         - containerPort: 8080
+          name: http
+
+        env:
+        - name: CHUNK_MB
+          value: "5"
+        - name: TTL_SECONDS
+          value: "60"
+        - name: MAX_MB          # stays well under the 384Mi limit -> no OOMKills
+          value: "200"
 
         resources:
-
           requests:
-            memory: 64Mi
+            # HPA math is a % of the REQUEST, so this value sets the threshold.
+            # target 70% of 128Mi ~= 90Mi average memory across pods.
+            memory: 128Mi
             cpu: 50m
-
           limits:
-            memory: 256Mi
+            memory: 384Mi
             cpu: 200m
 
-        volumeMounts:
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
 
+        volumeMounts:
         - name: application-code
           mountPath: /app
 
       volumes:
-
       - name: application-code
-
         configMap:
           name: memory-app-code
