@@ -2,8 +2,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-hpa
+  labels:
+    app: nginx-hpa
+    app.kubernetes.io/part-of: hpa-demo
 spec:
+  # NOTE: Once the HPA is managing this Deployment, do NOT keep re-applying a
+  # hard-coded `replicas` value — a re-apply can fight the autoscaler. We set 1
+  # only as the starting point; after the first apply the HPA owns the count.
   replicas: 1
+  revisionHistoryLimit: 3
 
   selector:
     matchLabels:
@@ -16,17 +23,35 @@ spec:
 
     spec:
       containers:
-      - name: nginx
-        image: nginx:alpine
+        - name: nginx
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
 
-        ports:
-        - containerPort: 80
+          ports:
+            - name: http
+              containerPort: 80
 
-        resources:
-          requests:
-            cpu: 100m
-            memory: 64Mi
+          # Resource *requests* are REQUIRED for a CPU-based HPA.
+          # Utilization is computed as (actual usage / request), so with a
+          # request of 100m, a pod using 50m of CPU = 50% utilization.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
 
-          limits:
-            cpu: 200m
-            memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10

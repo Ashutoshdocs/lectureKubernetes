@@ -2,18 +2,32 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: load-generator
+  labels:
+    app: load-generator
+    app.kubernetes.io/part-of: hpa-demo
 spec:
+  # This is a throwaway load driver — don't restart it if the loop ever exits.
+  restartPolicy: Never
+
   containers:
-  - name: load-generator
-    image: busybox:1.36
+    - name: load-generator
+      image: busybox:1.36
 
-    command:
-    - /bin/sh
-    - -c
+      resources:
+        requests:
+          cpu: 50m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 32Mi
 
-    args:
-    - |
-      while true
-      do
-        wget -q -O- http://nginx-hpa-svc
-      done
+      command:
+        - /bin/sh
+        - -c
+
+      args:
+        - |
+          echo "Hammering http://nginx-hpa-svc ... (Ctrl-C or delete this pod to stop)"
+          while true; do
+            wget -q -O- http://nginx-hpa-svc > /dev/null
+          done

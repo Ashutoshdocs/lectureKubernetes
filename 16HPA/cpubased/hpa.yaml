@@ -1,11 +1,12 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
-
 metadata:
   name: nginx-hpa
+  labels:
+    app: nginx-hpa
+    app.kubernetes.io/part-of: hpa-demo
 
 spec:
-
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
@@ -15,11 +16,40 @@ spec:
   maxReplicas: 5
 
   metrics:
-  - type: Resource
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50   # scale so average CPU stays ~50% of request
 
-    resource:
-      name: cpu
+    # Optional: also scale on memory. Uncomment to enable a second signal —
+    # the HPA scales on whichever metric demands the most replicas.
+    # - type: Resource
+    #   resource:
+    #     name: memory
+    #     target:
+    #       type: Utilization
+    #       averageUtilization: 70
 
-      target:
-        type: Utilization
-        averageUtilization: 50
+  # `behavior` tunes how fast the HPA reacts. These values make the demo snappy
+  # and easy to observe; the commented defaults are what Kubernetes uses if you
+  # omit this whole block.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # default: 0 — react to load immediately
+      policies:
+        - type: Pods
+          value: 2                      # add up to 2 pods ...
+          periodSeconds: 15             # ... every 15s
+        - type: Percent
+          value: 100                    # ... or double the count, whichever is more
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 60    # default: 300 — shortened so it scales back down sooner
+      policies:
+        - type: Pods
+          value: 1                      # remove 1 pod ...
+          periodSeconds: 30             # ... every 30s
+      selectPolicy: Max
