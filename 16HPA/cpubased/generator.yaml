@@ -1,33 +1,45 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: ReplicaSet
+
 metadata:
   name: load-generator
-  labels:
-    app: load-generator
-    app.kubernetes.io/part-of: hpa-demo
+
 spec:
-  # This is a throwaway load driver — don't restart it if the loop ever exits.
-  restartPolicy: Never
+  replicas: 1
 
-  containers:
-    - name: load-generator
-      image: busybox:1.36
+  selector:
+    matchLabels:
+      app: load-generator
 
-      resources:
-        requests:
-          cpu: 50m
-          memory: 16Mi
-        limits:
-          cpu: 100m
-          memory: 32Mi
+  template:
+    metadata:
+      labels:
+        app: load-generator
+        app.kubernetes.io/part-of: hpa-demo
 
-      command:
-        - /bin/sh
-        - -c
+    spec:
+      restartPolicy: Always
 
-      args:
-        - |
-          echo "Hammering http://nginx-hpa-svc ... (Ctrl-C or delete this pod to stop)"
-          while true; do
-            wget -q -O- http://nginx-hpa-svc > /dev/null
-          done
+      containers:
+        - name: load-generator
+          image: busybox:1.36
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+
+          command:
+            - /bin/sh
+            - -c
+
+          args:
+            - |
+              echo "Hammering http://nginx-hpa-svc ..."
+              while true; do
+                wget -q -O- http://nginx-hpa-svc > /dev/null
+              done
+#kubectl scale rs load-generator --replicas=5
