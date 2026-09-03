@@ -1,31 +1,43 @@
+# scaleobject.yaml
+# The heart of the demo: a KEDA ScaledObject that ties the "worker" Deployment
+# to the length of the Redis "tasks" list. When you apply this, KEDA creates a
+# HorizontalPodAutoscaler named "keda-hpa-worker-scaler" behind the scenes.
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-
 metadata:
   name: worker-scaler
   namespace: default
-
 spec:
-
+  # ---- What to scale ----
   scaleTargetRef:
-    name: worker
+    name: worker            # must match the Deployment name
 
+  # ---- Replica bounds ----
+  # minReplicaCount: 0 enables SCALE-TO-ZERO, the whole point of KEDA.
+  # A plain HorizontalPodAutoscaler cannot go below 1.
   minReplicaCount: 0
   maxReplicaCount: 10
 
-  pollingInterval: 5
-  cooldownPeriod: 30
+  # ---- Timing ----
+  pollingInterval: 5        # how often (s) KEDA queries Redis for the metric
+  cooldownPeriod: 30        # how long (s) after the last "active" reading
+                            # before KEDA scales the worker back to 0
 
+  # ---- Trigger(s): the event source that drives scaling ----
   triggers:
-
     - type: redis
-
       metadata:
-
         address: redis.default.svc.cluster.local:6379
-
         listName: tasks
 
+        # Target items PER REPLICA.
+        #   desiredReplicas = ceil( LLEN(tasks) / listLength )
+        # e.g. 50 queued / 5 = 10 replicas (then capped by maxReplicaCount).
         listLength: "5"
+
+        # Queue length that must be EXCEEDED to wake the app from zero (0 -> 1).
+        # Default is 0, so any single item activates. Raise it to avoid waking
+        # up for trivially small bursts. Uncomment to experiment:
+        # activationListLength: "5"
 
         databaseIndex: "0"

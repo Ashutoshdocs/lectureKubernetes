@@ -1,26 +1,41 @@
+# worker.yaml
+# The workload KEDA scales. It starts at replicas: 0 (scaled to zero); KEDA
+# brings it up when the Redis "tasks" list grows, then back to 0 when the queue
+# drains and the cooldownPeriod elapses.
+#
+# The container reuses the redis:7-alpine image only because it ships redis-cli.
+# Each pod loops: read the queue length, LPOP one task, print it, sleep, repeat.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
   namespace: default
-
+  labels:
+    app: worker
 spec:
+  # Start at zero. Once the ScaledObject is applied, KEDA OWNS this number —
+  # don't edit replicas by hand afterwards, it will be overwritten.
   replicas: 0
-
   selector:
     matchLabels:
       app: worker
-
   template:
     metadata:
       labels:
         app: worker
-
     spec:
       containers:
         - name: worker
           image: redis:7-alpine
-
+          # Tiny requests so all 10 replicas comfortably fit on a
+          # laptop-sized cluster (kind / minikube / Docker Desktop).
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
           command:
             - /bin/sh
             - -c
@@ -32,10 +47,7 @@ spec:
 
               while true
               do
-                COUNT=$(redis-cli \
-                  -h redis.default.svc.cluster.local \
-                  -p 6379 \
-                  LLEN tasks)
+                COUNT=$(redis-cli -h redis.default.svc.cluster.local -p 6379 LLEN tasks)
 
                 echo "------------------------------------"
                 echo "Worker: $(hostname)"
@@ -43,18 +55,10 @@ spec:
                 echo "------------------------------------"
 
                 if [ "$COUNT" -gt "0" ]; then
-
-                  TASK=$(redis-cli \
-                    -h redis.default.svc.cluster.local \
-                    -p 6379 \
-                    LPOP tasks)
-
+                  TASK=$(redis-cli -h redis.default.svc.cluster.local -p 6379 LPOP tasks)
                   echo "Processed task: $TASK"
-
                 else
-
                   echo "No tasks available"
-
                 fi
 
                 sleep 2

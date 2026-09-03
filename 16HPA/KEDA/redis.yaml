@@ -1,39 +1,60 @@
+# redis.yaml
+# A single-replica Redis instance that acts as the "task queue" for the demo.
+# The worker pops items from a Redis list; KEDA watches that list's length and
+# scales the worker Deployment up and down accordingly.
+#
+# NOTE: demo only — no persistence, no auth. A real deployment would use a
+# StatefulSet, a PersistentVolumeClaim, and a password/ACLs.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
   namespace: default
+  labels:
+    app: redis
 spec:
   replicas: 1
-
   selector:
     matchLabels:
       app: redis
-
   template:
     metadata:
       labels:
         app: redis
-
     spec:
       containers:
         - name: redis
           image: redis:7-alpine
-
           ports:
             - containerPort: 6379
-
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 10
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
   namespace: default
-
+  labels:
+    app: redis
 spec:
   selector:
     app: redis
-
   ports:
     - name: redis
       port: 6379
