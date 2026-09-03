@@ -1,33 +1,34 @@
-﻿apiVersion: autoscaling.k8s.io/v1
+# ---------------------------------------------------------------------------
+# VPA DEMO - Step 1: OFF mode (observe only)
+#
+# updateMode: "Off"  ->  VPA calculates Target / Lower Bound / Upper Bound
+#                        recommendations but NEVER touches the running pod.
+#
+# This is the safe way to see what VPA *would* do before letting it act.
+# ---------------------------------------------------------------------------
+apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
-
 metadata:
   name: vpa-demo
-
 spec:
-
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: vpa-demo
 
   updatePolicy:
-    updateMode: "Off"
+    updateMode: "Off"        # recommend only, do not apply
 
   resourcePolicy:
-
     containerPolicies:
-
-    - containerName: vpa-demo
-
-      minAllowed:
-        cpu: 50m
-        memory: 32Mi
-
-      maxAllowed:
-        cpu: 400m
-        memory: 256Mi
-
-      controlledResources:
-      - cpu
-      - memory
+      - containerName: vpa-demo
+        # VPA will clamp its recommendation to this range.
+        minAllowed:
+          cpu: 50m
+          memory: 32Mi
+        maxAllowed:
+          cpu: 400m
+          memory: 256Mi
+        controlledResources:
+          - cpu
+          - memory

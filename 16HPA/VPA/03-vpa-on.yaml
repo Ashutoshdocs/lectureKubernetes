@@ -1,33 +1,43 @@
-﻿apiVersion: autoscaling.k8s.io/v1
+# ---------------------------------------------------------------------------
+# VPA DEMO - Step 2: ON mode (apply recommendations)
+#
+# updateMode: "Recreate"  ->  VPA may EVICT the pod. The Deployment then
+#                             creates a replacement, and the VPA admission
+#                             controller injects the recommended CPU/memory
+#                             requests into the new pod.
+#
+# minReplicas: 1 is the important addition vs. a naive config: it tells the
+# updater it may act even though only one replica exists. Without it, the
+# updater's default floor (--min-replicas=2) blocks eviction and nothing
+# happens.
+#
+# Newer option (Kubernetes 1.33+ / VPA 1.4+, GA in K8s 1.35): you can swap
+# "Recreate" for "InPlaceOrRecreate" to resize the pod in place (no restart)
+# when possible, falling back to eviction only when it can't. See the README.
+# ---------------------------------------------------------------------------
+apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
-
 metadata:
   name: vpa-demo
-
 spec:
-
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: vpa-demo
 
   updatePolicy:
-    updateMode: "Recreate"
+    updateMode: "Recreate"   # try "InPlaceOrRecreate" on K8s 1.33+/VPA 1.4+
+    minReplicas: 1           # allow the updater to act on a single replica
 
   resourcePolicy:
-
     containerPolicies:
-
-    - containerName: vpa-demo
-
-      minAllowed:
-        cpu: 50m
-        memory: 32Mi
-
-      maxAllowed:
-        cpu: 400m
-        memory: 256Mi
-
-      controlledResources:
-      - cpu
-      - memory
+      - containerName: vpa-demo
+        minAllowed:
+          cpu: 50m
+          memory: 32Mi
+        maxAllowed:
+          cpu: 400m
+          memory: 256Mi
+        controlledResources:
+          - cpu
+          - memory

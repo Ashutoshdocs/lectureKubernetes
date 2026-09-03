@@ -1,52 +1,51 @@
-﻿apiVersion: apps/v1
+# ---------------------------------------------------------------------------
+# VPA DEMO - Target workload
+#
+# A tiny busybox pod that intentionally burns CPU in a loop so that the
+# Vertical Pod Autoscaler has real usage to observe and react to.
+#
+# NOTE: replicas is 1 on purpose.
+#   The VPA *updater* will not evict a pod if doing so drops the number of
+#   running replicas below its --min-replicas flag (default: 2). With 1
+#   replica here plus updatePolicy.minReplicas: 1 in 03-vpa-on.yaml, the
+#   updater is allowed to recreate the single pod so the demo actually works.
+#   (This is the #1 reason "Recreate mode does nothing" for people.)
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
 kind: Deployment
-
 metadata:
   name: vpa-demo
-
+  labels:
+    app: vpa-demo
 spec:
-  replicas: 2
-
+  replicas: 1
   selector:
     matchLabels:
       app: vpa-demo
-
   template:
-
     metadata:
       labels:
         app: vpa-demo
-
     spec:
-
       containers:
-
-      - name: vpa-demo
-
-        image: busybox:1.36
-
-        command:
-        - /bin/sh
-        - -c
-
-        args:
-        - |
-          echo "VPA DEMO APPLICATION STARTED"
-
-          while true
-          do
-            for i in $(seq 1 100000)
-            do
-              echo $i > /dev/null
-            done
-          done
-
-        resources:
-
-          requests:
-            cpu: 50m
-            memory: 32Mi
-
-          limits:
-            cpu: 500m
-            memory: 256Mi
+        - name: vpa-demo
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              echo "VPA DEMO APPLICATION STARTED"
+              while true; do
+                for i in $(seq 1 100000); do
+                  echo $i > /dev/null
+                done
+              done
+          resources:
+            # Deliberately UNDER-provisioned so VPA recommends an increase.
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
