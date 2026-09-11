@@ -1,0 +1,79 @@
+# A normal application workload (nginx) that serves traffic and never calls the
+# Kubernetes API. It demonstrates the "no token, fully hardened" baseline.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: acme-prod
+  labels:
+    app.kubernetes.io/name: web-app
+    app.kubernetes.io/part-of: serviceaccount-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web-app
+        app.kubernetes.io/part-of: serviceaccount-demo
+    spec:
+      serviceAccountName: web-app
+      # Belt-and-suspenders: also refuse the token at the pod level.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          # Unprivileged nginx listens on 8080 and runs as UID 101 (non-root),
+          # which is required by the restricted Pod Security profile.
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports:
+            - containerPort: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          # readOnlyRootFilesystem means nginx can't write to its usual paths,
+          # so we give it small in-memory scratch volumes.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}

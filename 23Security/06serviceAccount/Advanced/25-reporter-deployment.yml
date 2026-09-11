@@ -1,0 +1,107 @@
+# The reporter workload. Unlike the app, it needs API access, so it mounts a
+# token -- but an explicit, hardened one.
+#
+# Instead of relying on the legacy auto-mounted token, we build the credential
+# ourselves with a "projected" volume:
+#   - serviceAccountToken : a bound token that EXPIRES (1h here) and is scoped to
+#                           a specific audience. Kubernetes rotates it before it
+#                           expires. This is far safer than the old, never-
+#                           expiring Secret-based tokens.
+#   - configMap kube-root-ca.crt : the cluster CA, so the client trusts the API.
+#   - downwardAPI namespace      : so in-cluster kubectl knows its namespace.
+#
+# We mount all three at the standard path, so the in-cluster kubectl picks them
+# up automatically -- no kubeconfig needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporter
+  namespace: acme-prod
+  labels:
+    app.kubernetes.io/name: reporter
+    app.kubernetes.io/part-of: serviceaccount-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: reporter
+        app.kubernetes.io/part-of: serviceaccount-demo
+    spec:
+      serviceAccountName: reporter
+      # Don't let Kubernetes auto-mount a second token; we provide our own below.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kubectl
+          # Any kubectl image works. Pinned for reproducibility (see README note
+          # if this tag is unavailable on your registry).
+          image: alpine/kubectl:1.31.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "reporter running as: $(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace):reporter"
+              while true; do
+                echo "===== $(date -u) ====="
+                echo "[pods I can see]"
+                kubectl get pods -o name || true
+                echo "[app-config I am allowed to read]"
+                kubectl get configmap app-config -o jsonpath='{.data}' || true
+                echo
+                sleep 30
+              done
+          env:
+            # kubectl needs a writable HOME/cache under a read-only root fs.
+            - name: HOME
+              value: /tmp
+            - name: KUBECACHEDIR
+              value: /tmp/kube-cache
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: kube-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: kube-api-access
+          projected:
+            defaultMode: 0444
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600          # 1 hour; minimum allowed is 600
+                  audience: https://kubernetes.default.svc
+              - configMap:
+                  name: kube-root-ca.crt           # auto-created in every namespace
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace

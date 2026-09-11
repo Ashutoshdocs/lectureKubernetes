@@ -1,0 +1,24 @@
+# Two ConfigMaps used to prove the resourceNames restriction:
+#   - app-config   : the reporter IS allowed to read this one.
+#   - other-config : same namespace, but the reporter is NOT allowed to read it.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: acme-prod
+  labels:
+    app.kubernetes.io/part-of: serviceaccount-demo
+data:
+  greeting: "hello from app-config"
+  log_level: "info"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: other-config
+  namespace: acme-prod
+  labels:
+    app.kubernetes.io/part-of: serviceaccount-demo
+data:
+  note: "the reporter must NOT be able to read this"
