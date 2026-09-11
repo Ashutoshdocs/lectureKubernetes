@@ -1,0 +1,30 @@
+# OPTIONAL / for teaching.
+#
+# 07-make-user.sh already gives each user FULL access (cluster-admin) on their
+# own cluster, which is what the exercise asks for. If instead you want to show
+# a *restricted* user (admin of ONE namespace only), apply this on the cluster
+# and DON'T create the cluster-admin binding.
+#
+#   kubectl apply -f optional-namespace-admin.yaml
+#
+# Then the user 'manohar' could manage everything inside namespace "team-a"
+# but nothing cluster-wide.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: manohar-ns-admin
+  namespace: team-a
+subjects:
+  - kind: User
+    name: manohar          # matches the cert CN
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: admin              # built-in role, scoped to the namespace by RoleBinding
+  apiGroup: rbac.authorization.k8s.io
