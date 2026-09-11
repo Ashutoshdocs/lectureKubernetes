@@ -1,0 +1,17 @@
+# A ClusterRole is NOT tied to a namespace.
+# It can grant access to:
+#   - namespaced resources across ALL namespaces (e.g. pods everywhere), and
+#   - cluster-scoped resources that no namespaced Role can ever grant (e.g. nodes).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-pod-viewer
+rules:
+# Read pods and their logs in every namespace
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+# Read cluster-scoped nodes (only possible via a ClusterRole)
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]

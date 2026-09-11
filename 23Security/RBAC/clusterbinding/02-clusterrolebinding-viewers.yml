@@ -1,0 +1,21 @@
+# >>> THE HEART OF THIS DEMO <<<
+# A single ClusterRoleBinding grants the ClusterRole to TWO users,
+# cluster-wide (every namespace + cluster-scoped resources).
+#
+# There is no `namespace:` field here — a ClusterRoleBinding is not
+# scoped to one namespace. That is the difference from a RoleBinding.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-pod-viewers-binding
+subjects:
+- kind: User
+  name: carol            # CN=carol in carol's client certificate
+  apiGroup: rbac.authorization.k8s.io
+- kind: User
+  name: dave             # CN=dave in dave's client certificate
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-pod-viewer
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,31 @@
+# Two namespaces, one pod in each, to prove that carol and dave can
+# see pods across the WHOLE cluster (not just one namespace).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dev
+  namespace: dev
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-prod
+  namespace: prod
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest

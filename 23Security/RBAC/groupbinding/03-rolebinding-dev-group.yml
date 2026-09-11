@@ -1,0 +1,23 @@
+# >>> THE HEART OF THIS DEMO <<<
+# The subject is a GROUP, not an individual user.
+#
+# In Kubernetes X.509 auth:
+#   - the certificate's CN (Common Name)  -> the USERNAME
+#   - the certificate's O  (Organization) -> a GROUP the user belongs to
+#
+# So ANY user whose client certificate carries `O=dev` automatically
+# inherits this binding. Onboarding a new developer requires NO change
+# to this file.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-pod-viewer-binding
+  namespace: dev
+subjects:
+- kind: Group
+  name: dev                 # <-- matches O=dev in the client certificate
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-viewer
+  apiGroup: rbac.authorization.k8s.io

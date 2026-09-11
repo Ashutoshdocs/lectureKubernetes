@@ -1,0 +1,15 @@
+# A namespaced Role: read-only access to pods and their logs in `dev`.
+# This is the SAME whether you bind to a user or a group — only the
+# RoleBinding's subject changes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: dev
+  name: pod-viewer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
