@@ -190,16 +190,22 @@ Now deliver each kubeconfig to the bastion into that person's home directory.
 From your laptop:
 ```bash
 # Manohar
-scp $ADMIN_USER@$C1CP_PUB:/tmp/manohar-kube/manohar.kubeconfig /tmp/
-scp /tmp/manohar.kubeconfig $ADMIN_USER@$CLUSTERWORK_PUB:/tmp/
-ssh $ADMIN_USER@$CLUSTERWORK_PUB \
-  'sudo install -o manohar -g manohar -m 600 /tmp/manohar.kubeconfig /home/manohar/.kube/config'
+ssh $ADMIN_USER@$C1CP_PUB
+sudo cp /tmp/manohar-kube/manohar.kubeconfig /home/azureuser/manohar.kubeconfig
+sudo chown azureuser:azureuser /home/azureuser/manohar.kubeconfig
+chmod 600 /home/azureuser/manohar.kubeconfig
+on git : scp $ADMIN_USER@$C1CP_PUB:/home/azureuser/manohar.kubeconfig /tmp/
+         scp /tmp/manohar.kubeconfig $ADMIN_USER@$CLUSTERWORK_PUB:/tmp/
+		 ssh $ADMIN_USER@$CLUSTERWORK_PUB 'sudo mkdir -p /home/manohar/.kube && sudo install -o manohar -g manohar -m 600 /tmp/manohar.kubeconfig /home/manohar/.kube/config'
 
 # Ashutosh
-scp $ADMIN_USER@$C2CP_PUB:/tmp/ashutosh-kube/ashutosh.kubeconfig /tmp/
-scp /tmp/ashutosh.kubeconfig $ADMIN_USER@$CLUSTERWORK_PUB:/tmp/
-ssh $ADMIN_USER@$CLUSTERWORK_PUB \
-  'sudo install -o ashutosh -g ashutosh -m 600 /tmp/ashutosh.kubeconfig /home/ashutosh/.kube/config'
+ssh $ADMIN_USER@$C2CP_PUB
+sudo cp /tmp/ashutosh-kube/ashutosh.kubeconfig /home/azureuser/ashutosh.kubeconfig
+sudo chown azureuser:azureuser /home/azureuser/ashutosh.kubeconfig
+chmod 600 /home/azureuser/ashutosh.kubeconfig
+on git: scp $ADMIN_USER@$C2CP_PUB:/home/azureuser/ashutosh.kubeconfig /tmp/
+        scp /tmp/ashutosh.kubeconfig $ADMIN_USER@$CLUSTER2WORK_PUB:/tmp/
+		ssh $ADMIN_USER@$CLUSTER2WORK_PUB 'sudo mkdir -p /home/ashutosh/.kube && sudo install -o ashutosh -g ashutosh -m 600 /tmp/ashutosh.kubeconfig /home/ashutosh/.kube/config'
 ```
 
 ---
