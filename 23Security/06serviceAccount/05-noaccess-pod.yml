@@ -1,0 +1,17 @@
+# The "powerless" pod. It has NO serviceAccountName, so it falls back to the
+# namespace's automatically-created "default" ServiceAccount, which has no Roles
+# bound to it. Any API call it makes will be rejected with 403 Forbidden.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nopowerhere
+  namespace: practical
+  labels:
+    demo: rbac-serviceaccount
+    access: no-permissions
+spec:
+  # serviceAccountName intentionally omitted -> uses "default" SA
+  containers:
+    - name: kubectl
+      image: bitnami/kubectl
+      command: ["sleep", "3600"]

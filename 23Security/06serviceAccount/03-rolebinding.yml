@@ -1,0 +1,18 @@
+# The RoleBinding is the glue: it grants the permissions in "pod-role"
+# to the "pod-creator" ServiceAccount. Without this binding, the ServiceAccount
+# still exists but can do nothing.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-rolebinding
+  namespace: practical
+  labels:
+    demo: rbac-serviceaccount
+subjects:
+  - kind: ServiceAccount        # WHO gets the permissions
+    name: pod-creator
+    namespace: practical
+roleRef:                        # WHICH permissions they get
+  kind: Role
+  name: pod-role
+  apiGroup: rbac.authorization.k8s.io

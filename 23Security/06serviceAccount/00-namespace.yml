@@ -1,0 +1,8 @@
+# The namespace everything in this demo lives in.
+# Keeping the demo in its own namespace makes cleanup a single command.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: practical
+  labels:
+    demo: rbac-serviceaccount
