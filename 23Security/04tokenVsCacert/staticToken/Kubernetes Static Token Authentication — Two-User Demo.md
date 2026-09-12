@@ -59,51 +59,112 @@ Paste:
 ```bash
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
+
+# ============================================================
+# Kubernetes Static Token Authentication
+# ============================================================
 
 MANIFEST="/etc/kubernetes/manifests/kube-apiserver.yaml"
-TOKEN_DIR="/etc/kubernetes/auth"
-TOKEN_FILE="${TOKEN_DIR}/tokens.csv"
+AUTH_DIR="/etc/kubernetes/auth"
+TOKEN_FILE="${AUTH_DIR}/tokens.csv"
 
-echo "=============================================="
-echo " Kubernetes Static Token Authentication Setup"
-echo "=============================================="
+BACKUP=""
 
-# ------------------------------------------------
-# 1. Check root privileges
-# ------------------------------------------------
+# ============================================================
+# Cleanup / rollback
+# ============================================================
+
+rollback() {
+
+    echo
+    echo "================================================"
+    echo " ERROR: Configuration failed"
+    echo "================================================"
+
+    if [[ -n "${BACKUP}" && -f "${BACKUP}" ]]; then
+
+        echo
+        echo "Restoring previous API Server manifest..."
+
+        cp -f "${BACKUP}" "${MANIFEST}"
+
+        echo "Original manifest restored:"
+        echo "  ${MANIFEST}"
+
+        echo
+        echo "Backup retained:"
+        echo "  ${BACKUP}"
+
+    else
+
+        echo "No backup available for restoration."
+
+    fi
+
+    echo
+    echo "The token file was not removed automatically."
+    echo "Review:"
+    echo "  ${TOKEN_FILE}"
+
+    exit 1
+}
+
+trap rollback ERR
+
+# ============================================================
+# Header
+# ============================================================
+
+echo "================================================"
+echo " Kubernetes Static Token Authentication"
+echo "================================================"
+
+# ============================================================
+# 1. Root check
+# ============================================================
 
 if [[ "${EUID}" -ne 0 ]]; then
-    echo "ERROR: Run this script as root."
-    echo "Example:"
+    echo
+    echo "ERROR: This script must be run as root."
+    echo
+    echo "Run:"
     echo "  sudo $0"
     exit 1
 fi
 
-# ------------------------------------------------
-# 2. Check kube-apiserver manifest
-# ------------------------------------------------
+# ============================================================
+# 2. Check API Server manifest
+# ============================================================
+
+echo
+echo "[1/8] Checking API Server manifest..."
 
 if [[ ! -f "${MANIFEST}" ]]; then
-    echo "ERROR: kube-apiserver manifest not found:"
+    echo
+    echo "ERROR: API Server manifest not found:"
     echo "  ${MANIFEST}"
     exit 1
 fi
 
-# ------------------------------------------------
+echo "Found:"
+echo "  ${MANIFEST}"
+
+# ============================================================
 # 3. Create authentication directory
-# ------------------------------------------------
+# ============================================================
 
 echo
-echo "[1/6] Creating token authentication directory..."
+echo "[2/8] Creating authentication directory..."
 
-mkdir -p "${TOKEN_DIR}"
+mkdir -p "${AUTH_DIR}"
 
-# ------------------------------------------------
-# 4. Create token file
-# ------------------------------------------------
+# ============================================================
+# 4. Create static token file
+# ============================================================
 
-echo "[2/6] Creating static token file..."
+echo
+echo "[3/8] Creating static token file..."
 
 cat > "${TOKEN_FILE}" <<'EOF'
 alice-token-123,alice,alice-id,"devs"
@@ -112,97 +173,223 @@ EOF
 
 chmod 600 "${TOKEN_FILE}"
 
-echo "Token file created:"
+echo "Created:"
 echo "  ${TOKEN_FILE}"
 
-# ------------------------------------------------
+# ============================================================
 # 5. Backup API Server manifest
-# ------------------------------------------------
+# ============================================================
+
+echo
+echo "[4/8] Creating backup..."
 
 BACKUP="${MANIFEST}.backup.$(date +%Y%m%d-%H%M%S)"
 
-echo
-echo "[3/6] Creating API Server manifest backup..."
+cp -a "${MANIFEST}" "${BACKUP}"
 
-cp "${MANIFEST}" "${BACKUP}"
-
-echo "Backup:"
+echo "Backup created:"
 echo "  ${BACKUP}"
 
-# ------------------------------------------------
-# 6. Update API Server command
-# ------------------------------------------------
+# ============================================================
+# 6. Check existing configuration
+# ============================================================
 
 echo
-echo "[4/6] Updating kube-apiserver command..."
+echo "[5/8] Checking existing configuration..."
 
-if grep -q -- "--token-auth-file=" "${MANIFEST}"; then
+TOKEN_ARG="--token-auth-file=${TOKEN_FILE}"
 
-    echo "Existing --token-auth-file found."
-
-    sed -i \
-      "s|^[[:space:]]*-[[:space:]]*--token-auth-file=.*|    - --token-auth-file=${TOKEN_FILE}|" \
-      "${MANIFEST}"
-
+if grep -Fq -- "${TOKEN_ARG}" "${MANIFEST}"; then
+    echo "token-auth-file already exists."
 else
+    echo "token-auth-file is not configured."
+fi
 
-    echo "Adding --token-auth-file..."
+if grep -Fq "name: token-auth" "${MANIFEST}"; then
+    echo "token-auth volume/mount already exists."
+else
+    echo "token-auth volume/mount is not configured."
+fi
 
-    sed -i \
-      "/^[[:space:]]*command:/a\    - --token-auth-file=${TOKEN_FILE}" \
-      "${MANIFEST}"
+# ============================================================
+# 7. Modify API Server manifest
+# ============================================================
+
+echo
+echo "[6/8] Updating API Server manifest..."
+
+TMP_FILE="$(mktemp)"
+
+cp "${MANIFEST}" "${TMP_FILE}"
+
+# ------------------------------------------------------------
+# Add --token-auth-file
+# ------------------------------------------------------------
+
+if ! grep -Fq -- "${TOKEN_ARG}" "${TMP_FILE}"; then
+
+    awk -v token_arg="${TOKEN_ARG}" '
+    /^    command:/ {
+        print
+        print "    - " token_arg
+        next
+    }
+    { print }
+    ' "${TMP_FILE}" > "${TMP_FILE}.new"
+
+    mv "${TMP_FILE}.new" "${TMP_FILE}"
 
 fi
 
-# ------------------------------------------------
-# 7. Add volumeMount
-# ------------------------------------------------
+# ------------------------------------------------------------
+# Add volumeMount
+# ------------------------------------------------------------
 
-echo
-echo "[5/6] Adding token directory volume mount..."
+if ! grep -Fq "mountPath: ${AUTH_DIR}" "${TMP_FILE}"; then
 
-if grep -q "name: token-auth" "${MANIFEST}"; then
+    awk -v auth_dir="${AUTH_DIR}" '
+    /^    volumeMounts:/ {
+        print
+        print "    - mountPath: " auth_dir
+        print "      name: token-auth"
+        print "      readOnly: true"
+        next
+    }
+    { print }
+    ' "${TMP_FILE}" > "${TMP_FILE}.new"
 
-    echo "token-auth volume already exists."
-
-else
-
-    # Add volumeMount immediately after the existing
-    # volumeMounts section.
-    sed -i \
-      "/^[[:space:]]*volumeMounts:/a\    - mountPath: ${TOKEN_DIR}\n      name: token-auth\n      readOnly: true" \
-      "${MANIFEST}"
-
-    # Add hostPath volume.
-    cat >> /dev/null <<EOF
-EOF
-
-    # Insert volume before the first existing volume entry.
-    sed -i \
-      "/^[[:space:]]*volumes:/a\  - hostPath:\n      path: ${TOKEN_DIR}\n      type: DirectoryOrCreate\n    name: token-auth" \
-      "${MANIFEST}"
+    mv "${TMP_FILE}.new" "${TMP_FILE}"
 
 fi
 
-# ------------------------------------------------
-# 8. Display configuration
-# ------------------------------------------------
+# ------------------------------------------------------------
+# Add hostPath volume
+# ------------------------------------------------------------
+
+if ! grep -Fq "path: ${AUTH_DIR}" "${TMP_FILE}"; then
+
+    awk -v auth_dir="${AUTH_DIR}" '
+    /^  volumes:/ {
+        print
+        print "  - hostPath:"
+        print "      path: " auth_dir
+        print "      type: DirectoryOrCreate"
+        print "    name: token-auth"
+        next
+    }
+    { print }
+    ' "${TMP_FILE}" > "${TMP_FILE}.new"
+
+    mv "${TMP_FILE}.new" "${TMP_FILE}"
+
+fi
+
+# Replace manifest only after all modifications completed.
+
+mv "${TMP_FILE}" "${MANIFEST}"
+
+# ============================================================
+# 8. Validate configuration
+# ============================================================
 
 echo
-echo "[6/6] Verifying configuration..."
+echo "[7/8] Validating configuration..."
+
+ERRORS=0
+
+# ------------------------------------------------------------
+# Check token argument
+# ------------------------------------------------------------
+
+if grep -Fq -- "${TOKEN_ARG}" "${MANIFEST}"; then
+    echo "✓ --token-auth-file configured"
+else
+    echo "✗ --token-auth-file missing"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# ------------------------------------------------------------
+# Check volumeMount
+# ------------------------------------------------------------
+
+if grep -Fq "mountPath: ${AUTH_DIR}" "${MANIFEST}" &&
+   grep -Fq "name: token-auth" "${MANIFEST}"; then
+
+    echo "✓ token-auth volumeMount configured"
+
+else
+
+    echo "✗ token-auth volumeMount missing"
+    ERRORS=$((ERRORS + 1))
+
+fi
+
+# ------------------------------------------------------------
+# Check hostPath
+# ------------------------------------------------------------
+
+if grep -Fq "path: ${AUTH_DIR}" "${MANIFEST}" &&
+   grep -Fq "type: DirectoryOrCreate" "${MANIFEST}" &&
+   grep -Fq "name: token-auth" "${MANIFEST}"; then
+
+    echo "✓ token-auth hostPath configured"
+
+else
+
+    echo "✗ token-auth hostPath missing"
+    ERRORS=$((ERRORS + 1))
+
+fi
+
+# ------------------------------------------------------------
+# Check token file
+# ------------------------------------------------------------
+
+if [[ -s "${TOKEN_FILE}" ]]; then
+    echo "✓ token file exists"
+else
+    echo "✗ token file missing or empty"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# ------------------------------------------------------------
+# Check permissions
+# ------------------------------------------------------------
+
+PERMISSIONS="$(stat -c '%a' "${TOKEN_FILE}")"
+
+if [[ "${PERMISSIONS}" == "600" ]]; then
+    echo "✓ token file permissions are 600"
+else
+    echo "✗ token file permissions are ${PERMISSIONS}"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# ============================================================
+# Validation result
+# ============================================================
+
+if [[ "${ERRORS}" -ne 0 ]]; then
+
+    echo
+    echo "Validation failed."
+    echo "Rollback will be performed."
+
+    false
+
+fi
+
+# ============================================================
+# Final output
+# ============================================================
 
 echo
-echo "Token authentication argument:"
-grep -- "--token-auth-file=" "${MANIFEST}" || true
+echo "[8/8] Configuration validated successfully."
 
 echo
-echo "Token volume:"
-grep -A4 -B1 "name: token-auth" "${MANIFEST}" || true
-
-echo
-echo "=============================================="
-echo " Configuration Complete"
-echo "=============================================="
+echo "================================================"
+echo " SUCCESS"
+echo "================================================"
 
 echo
 echo "Token file:"
@@ -217,14 +404,85 @@ echo "Backup:"
 echo "  ${BACKUP}"
 
 echo
-echo "Kubelet should detect the manifest change and"
-echo "restart the kube-apiserver static Pod."
+echo "Configured argument:"
+grep -F -- "${TOKEN_ARG}" "${MANIFEST}"
 
 echo
-echo "Check with:"
+echo "Token volume configuration:"
+grep -A4 -B1 "name: token-auth" "${MANIFEST}"
+
+echo
+echo "The kubelet should detect the manifest change"
+echo "and recreate the kube-apiserver static Pod."
+
+echo
+echo "Check:"
 echo
 echo "  kubectl get pods -n kube-system | grep kube-apiserver"
+
 echo
+echo "================================================"
+```
+
+---
+
+# Run the Script
+
+Make it executable:
+
+```bash
+chmod +x configure-static-token-auth.sh
+```
+
+Run:
+
+```bash
+sudo ./configure-static-token-auth.sh
+```
+
+---
+
+# Expected Output
+
+You should see something similar to:
+
+```text
+================================================
+ Kubernetes Static Token Authentication
+================================================
+
+[1/8] Checking API Server manifest...
+Found:
+  /etc/kubernetes/manifests/kube-apiserver.yaml
+
+[2/8] Creating authentication directory...
+
+[3/8] Creating static token file...
+Created:
+  /etc/kubernetes/auth/tokens.csv
+
+[4/8] Creating backup...
+Backup created:
+  /etc/kubernetes/manifests/kube-apiserver.yaml.backup.20260912-123000
+
+[5/8] Checking existing configuration...
+token-auth-file is not configured.
+token-auth volume/mount is not configured.
+
+[6/8] Updating API Server manifest...
+
+[7/8] Validating configuration...
+✓ --token-auth-file configured
+✓ token-auth volumeMount configured
+✓ token-auth hostPath configured
+✓ token file exists
+✓ token file permissions are 600
+
+[8/8] Configuration validated successfully.
+
+================================================
+ SUCCESS
+================================================
 ```
 
 ---
