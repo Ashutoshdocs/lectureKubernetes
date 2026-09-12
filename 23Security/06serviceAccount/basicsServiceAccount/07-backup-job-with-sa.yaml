@@ -1,0 +1,32 @@
+# -----------------------------------------------------------------------------
+# THE SUCCEEDING CASE.
+# Identical to 06 EXCEPT serviceAccountName: backup-sa.
+# That SA is bound (via RoleBinding) to a Role that allows GET on the secret,
+# so the API returns it, the dump runs, and the upload to Azure succeeds.
+# -----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-backup-with-sa
+  namespace: sa-demo
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: backup-sa      # <-- the ONLY meaningful difference
+      restartPolicy: Never
+      containers:
+        - name: backup
+          image: mysql:8.0
+          command: ["bash", "/scripts/backup.sh"]
+          envFrom:
+            - secretRef:
+                name: mysql-cred
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+      volumes:
+        - name: script
+          configMap:
+            name: backup-script
+            defaultMode: 0755

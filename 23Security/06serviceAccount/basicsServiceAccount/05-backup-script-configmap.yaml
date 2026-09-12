@@ -1,0 +1,65 @@
+# -----------------------------------------------------------------------------
+# One script, shared by both Job variants. The ONLY difference between the
+# failing and succeeding Job is which ServiceAccount runs it.
+#
+# Flow:
+#   1. Read this pod's ServiceAccount token (auto-mounted by Kubernetes).
+#   2. Call the Kubernetes API to GET the azure-storage-cred Secret.  <-- RBAC gate
+#   3. If that succeeds, mysqldump the DB and PUT it to Azure Blob via the SAS URL.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-script
+  namespace: sa-demo
+data:
+  backup.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "==> Installing curl (mysqldump is already in this image)"
+    microdnf install -y curl >/dev/null 2>&1 || true
+
+    API=https://kubernetes.default.svc
+    SA=/var/run/secrets/kubernetes.io/serviceaccount
+    NS=$(cat "$SA/namespace")
+    TOKEN=$(cat "$SA/token")
+
+    echo "==> [RBAC GATE] Asking the Kubernetes API for Secret 'azure-storage-cred'"
+    echo "    Running as ServiceAccount in namespace: $NS"
+    HTTP=$(curl -sS -o /tmp/secret.json -w '%{http_code}' \
+      --cacert "$SA/ca.crt" \
+      -H "Authorization: Bearer $TOKEN" \
+      "$API/api/v1/namespaces/$NS/secrets/azure-storage-cred")
+
+    if [ "$HTTP" != "200" ]; then
+      echo "==> DENIED by the API (HTTP $HTTP)."
+      echo "    This ServiceAccount has no RBAC permission to read the secret,"
+      echo "    so the backup cannot get the storage credential. Aborting."
+      cat /tmp/secret.json
+      exit 1
+    fi
+    echo "==> ALLOWED. Got the secret from the API."
+
+    # Pull the base64 SAS_URL out of the API JSON and decode it.
+    SAS_URL=$(grep -o '"SAS_URL":"[^"]*"' /tmp/secret.json | cut -d'"' -f4 | base64 -d)
+
+    echo "==> Dumping MySQL database 'appdb' from the 'mysql' service"
+    mysqldump -h mysql -u root -p"$MYSQL_ROOT_PASSWORD" \
+      --databases appdb --set-gtid-purged=OFF > /tmp/appdb.sql
+    echo "    Dump size: $(wc -c < /tmp/appdb.sql) bytes"
+
+    STAMP=$(date +%Y%m%d-%H%M%S)
+    BASE=${SAS_URL%%\?*}     # https://acct.blob.core.windows.net/backups
+    QS=${SAS_URL#*\?}        # sv=...&sig=...
+    BLOB_URL="$BASE/appdb-$STAMP.sql?$QS"
+
+    echo "==> Uploading dump to Azure Blob as appdb-$STAMP.sql"
+    curl -sS -X PUT \
+      -H "x-ms-blob-type: BlockBlob" \
+      -H "Content-Type: application/sql" \
+      --data-binary @/tmp/appdb.sql \
+      "$BLOB_URL"
+
+    echo ""
+    echo "==> SUCCESS. Backup uploaded: appdb-$STAMP.sql"

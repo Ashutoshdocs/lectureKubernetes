@@ -1,0 +1,34 @@
+# -----------------------------------------------------------------------------
+# THE FAILING CASE.
+# This Job runs under the namespace's "default" ServiceAccount, which has no
+# RBAC. It still gets a token (tokens are auto-mounted), but the API rejects
+# its request for the Secret -> the script exits 1 -> the Job fails.
+#
+# Lesson: HAVING a ServiceAccount/token is not enough. RBAC decides.
+# -----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-backup-no-sa
+  namespace: sa-demo
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: default        # <-- no permissions
+      restartPolicy: Never
+      containers:
+        - name: backup
+          image: mysql:8.0
+          command: ["bash", "/scripts/backup.sh"]
+          envFrom:
+            - secretRef:
+                name: mysql-cred          # for the mysqldump password
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+      volumes:
+        - name: script
+          configMap:
+            name: backup-script
+            defaultMode: 0755

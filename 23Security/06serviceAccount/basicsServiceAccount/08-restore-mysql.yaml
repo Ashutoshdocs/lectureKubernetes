@@ -1,0 +1,45 @@
+# -----------------------------------------------------------------------------
+# A fresh, throwaway MySQL pod. We restore the dumped backup INTO this pod and
+# query it to prove the backup is valid. It has NO init data of its own, so any
+# rows you see afterward came purely from the restored dump.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: restore-mysql-cred
+  namespace: sa-demo
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "RestorePass123!"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restore-mysql
+  namespace: sa-demo
+  labels:
+    app: restore-mysql
+spec:
+  containers:
+    - name: mysql
+      image: mysql:8.0
+      ports:
+        - containerPort: 3306
+      envFrom:
+        - secretRef:
+            name: restore-mysql-cred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: restore-mysql
+  namespace: sa-demo
+spec:
+  type: NodePort
+  selector:
+    app: restore-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+      nodePort: 30307
