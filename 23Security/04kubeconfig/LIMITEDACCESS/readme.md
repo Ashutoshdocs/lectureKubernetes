@@ -139,6 +139,8 @@ kubectl --kubeconfig=./dev-admin.conf create deployment nginx --image=nginx -n d
 kubectl --kubeconfig=./dev-admin.conf get pods -n prod
 kubectl --kubeconfig=./dev-admin.conf get nodes            # cluster-scoped
 kubectl --kubeconfig=./dev-admin.conf get namespaces       # cluster-scoped
+kubectl --kubeconfig=./dev-admin.conf config get-contexts #View Your Current Contexts
+kubectl --kubeconfig=./dev-admin.conf config set-context --current --namespace=prod #Set the Default Namespace to prod
 ```
 
 ---
