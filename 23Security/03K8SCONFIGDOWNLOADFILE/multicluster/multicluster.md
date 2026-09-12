@@ -27,6 +27,32 @@ The laptop needs network access to TCP 6443 on each VM.
 
 ---
 
+## ⚠️ Read this first: the #1 pitfall in this demo
+
+Every cluster created by `kubeadm` ships with the SAME internal names:
+
+```text
+cluster : kubernetes
+user    : kubernetes-admin
+context : kubernetes-admin@kubernetes
+```
+
+When you merge two such kubeconfigs (`KUBECONFIG=cluster1.yaml:cluster2.yaml`),
+kubectl merges by **name** and uses **first-wins for any duplicate**. If both
+files still contain a cluster named `kubernetes` and a user named
+`kubernetes-admin`, the second cluster and user are silently thrown away. Both
+of your contexts then resolve to the **same** server + cert, and switching
+context does nothing — you keep talking to the first cluster.
+
+The classic symptom: `kubectl get pods` shows the **identical pod** under both
+`cluster1` and `cluster2`.
+
+**Fix:** before merging, make the **cluster name, the user name, AND the context
+name unique** in each file. Renaming only the context is NOT enough. This is
+covered in PART 10–12 below, which you must not skip.
+
+---
+
 # PART 1 — VM-1: Prepare Kubernetes API Server for Remote Access
 
 **RUN ON: Azure VM-1 (Kubernetes control-plane VM)**
@@ -159,6 +185,18 @@ echo "From your laptop:"
 echo "scp azure@${PUBLIC_IP}:/home/azure/admin.conf ./cluster1.yaml"
 echo ""
 ```
+
+> Optional but recommended: this script leaves the internal names as the kubeadm
+> defaults (`kubernetes` / `kubernetes-admin`). You will make them unique on the
+> laptop in PART 10–12. If you would rather bake unique names in at the source,
+> add a `read -p "Unique name (e.g. cluster1): " CN` prompt and, after the `sed`
+> that rewrites the server URL, run:
+>
+> ```bash
+> KUBECONFIG=/home/azure/admin.conf kubectl config rename-context kubernetes-admin@kubernetes "$CN"
+> KUBECONFIG=/home/azure/admin.conf kubectl config rename-cluster kubernetes "$CN"
+> sed -i "s/kubernetes-admin/${CN}-admin/g" /home/azure/admin.conf
+> ```
 
 Save:
 
@@ -443,6 +481,10 @@ kubectl --kubeconfig=./cluster1.yaml get pods -A
 kubectl --kubeconfig=./cluster2.yaml get pods -A
 ```
 
+> Note: each file works fine **on its own** even with duplicate internal names,
+> because there is nothing to collide with. The collision only appears once you
+> merge them (PART 13). Do PART 10–12 first.
+
 ---
 
 # PART 10 — Rename Context in Cluster 1
@@ -461,13 +503,13 @@ List contexts:
 kubectl --kubeconfig=./cluster1.yaml config get-contexts
 ```
 
-Usually kubeadm gives:
+Fresh from kubeadm, this is usually:
 
 ```text
 kubernetes-admin@kubernetes
 ```
 
-Rename:
+Rename the context:
 
 ```bash
 kubectl --kubeconfig=./cluster1.yaml \
@@ -476,7 +518,7 @@ kubernetes-admin@kubernetes \
 cluster1
 ```
 
-Verify (**RUN ON: Azure VM-2**):
+Verify (**RUN ON: Laptop**):
 
 ```bash
 kubectl --kubeconfig=./cluster1.yaml config get-contexts
@@ -503,7 +545,7 @@ kubernetes-admin@kubernetes \
 cluster2
 ```
 
-Verify (**RUN ON: Azure VM-2**):
+Verify (**RUN ON: Laptop**):
 
 ```bash
 kubectl --kubeconfig=./cluster2.yaml config get-contexts
@@ -511,45 +553,75 @@ kubectl --kubeconfig=./cluster2.yaml config get-contexts
 
 ---
 
-# PART 12 — Recommended: Rename Cluster Entries Too
+# PART 12 — REQUIRED: Rename the Cluster AND User Entries Too
 
 **RUN ON: Laptop**
 
-This avoids confusing duplicate cluster names when merging.
+This is the step that most people skip — and it is exactly what causes both
+contexts to point at the same cluster after merging. Renaming the context (PART
+10–11) does **not** rename the underlying `cluster` and `user` objects, and
+those are what collide.
 
-Cluster 1:
+`kubectl` provides `rename-cluster` but has **no `rename-user`** subcommand, so
+the user is renamed by editing the file directly. `kubernetes-admin` contains a
+hyphen, which never appears in base64 certificate/key data, so the `sed`
+substitution is safe.
+
+> On macOS, use `sed -i '' 's/.../.../g' file` instead of `sed -i 's/.../.../g' file`.
+> On Windows, run these in Git Bash (MINGW64), where `sed` is available.
+
+Cluster 1 — rename cluster, then user:
 
 ```bash
 kubectl --kubeconfig=./cluster1.yaml \
 config rename-cluster \
 kubernetes \
 cluster1
+
+sed -i 's/kubernetes-admin/cluster1-admin/g' cluster1.yaml
 ```
 
-Cluster 2:
+Cluster 2 — rename cluster, then user:
 
 ```bash
 kubectl --kubeconfig=./cluster2.yaml \
 config rename-cluster \
 kubernetes \
 cluster2
+
+sed -i 's/kubernetes-admin/cluster2-admin/g' cluster2.yaml
 ```
 
-Verify (**RUN ON: Azure VM-2**):
+Verify each file now has fully unique names (**RUN ON: Laptop**):
 
 ```bash
 kubectl --kubeconfig=./cluster1.yaml config view
-```
-
-```bash
 kubectl --kubeconfig=./cluster2.yaml config view
 ```
+
+You should see, respectively:
+
+```text
+cluster1.yaml   cluster: cluster1   user: cluster1-admin   context: cluster1
+cluster2.yaml   cluster: cluster2   user: cluster2-admin   context: cluster2
+```
+
+> If you already merged before doing this and got a stray `current-context:` in
+> a file (e.g. `cluster1.yaml` showing `current-context: cluster2`), fix it with:
+>
+> ```bash
+> kubectl --kubeconfig=./cluster1.yaml config use-context cluster1
+> ```
 
 ---
 
 # PART 13 — Merge Both Kubeconfigs
 
 **RUN ON: Laptop**
+
+> Do NOT merge until PART 12 is done. If a cluster named `kubernetes` or a user
+> named `kubernetes-admin` still exists in both files, the merge will drop the
+> duplicates and both contexts will point at the same cluster.
 
 ## Linux/macOS
 
@@ -568,10 +640,14 @@ kubectl config get-contexts
 Expected:
 
 ```text
-CURRENT   NAME
-*         cluster1
-          cluster2
+CURRENT   NAME       CLUSTER    AUTHINFO         NAMESPACE
+*         cluster1   cluster1   cluster1-admin
+          cluster2   cluster2   cluster2-admin
 ```
+
+Note the CLUSTER and AUTHINFO columns are now **different** per row — that is the
+proof the merge is correct. If they both say `kubernetes` / `kubernetes-admin`,
+go back to PART 12.
 
 ## Windows PowerShell
 
@@ -607,6 +683,12 @@ Expected:
 
 ```text
 cluster1
+```
+
+Confirm which server you are hitting:
+
+```bash
+kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
 ```
 
 Get nodes:
@@ -645,6 +727,12 @@ Expected:
 cluster2
 ```
 
+Confirm the server changed (this should print a DIFFERENT IP than PART 14):
+
+```bash
+kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
+```
+
 Get nodes:
 
 ```bash
@@ -670,7 +758,7 @@ kubectl config use-context cluster1
 kubectl create namespace cluster1-demo
 ```
 
-Verify (**RUN ON: Azure VM-2**):
+Verify (**RUN ON: Laptop**):
 
 ```bash
 kubectl get namespaces
@@ -748,9 +836,9 @@ kubectl --kubeconfig=./merged-config.yaml config get-contexts
 Expected:
 
 ```text
-CURRENT   NAME
-*         cluster1
-          cluster2
+CURRENT   NAME       CLUSTER    AUTHINFO
+*         cluster1   cluster1   cluster1-admin
+          cluster2   cluster2   cluster2-admin
 ```
 
 ---
@@ -800,7 +888,7 @@ Switch to Cluster 1:
 kubectl config use-context cluster1
 ```
 
-Run (**RUN ON: Azure VM-2**):
+Run (**RUN ON: Laptop**):
 
 ```bash
 kubectl get nodes
@@ -813,7 +901,7 @@ Switch to Cluster 2:
 kubectl config use-context cluster2
 ```
 
-Run (**RUN ON: Azure VM-2**):
+Run (**RUN ON: Laptop**):
 
 ```bash
 kubectl get nodes
@@ -879,6 +967,49 @@ echo
 
 **RUN ON: Laptop unless explicitly marked VM**
 
+## Both contexts return IDENTICAL nodes/pods (the collision bug)
+
+Symptom: after merging, `use-context cluster1` and `use-context cluster2` both
+show the same pods/nodes — you appear to be talking to one cluster.
+
+Cause: both files still contain a cluster named `kubernetes` and/or a user named
+`kubernetes-admin`, so the merge dropped the duplicates (first-wins) and both
+contexts resolve to the same cluster + user.
+
+Diagnose:
+
+```bash
+kubectl config get-contexts
+```
+
+If the CLUSTER and AUTHINFO columns are the same across rows, that is the bug.
+Also compare the effective server per context:
+
+```bash
+kubectl config use-context cluster1; kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
+kubectl config use-context cluster2; kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
+```
+
+If both print the same IP, the entries collided.
+
+Fix: redo PART 12 on the individual files (rename cluster AND user to unique
+names), then re-merge (PART 13). Example one-shot repair of already-downloaded
+files:
+
+```bash
+kubectl --kubeconfig=./cluster1.yaml config rename-cluster kubernetes cluster1
+sed -i 's/kubernetes-admin/cluster1-admin/g' cluster1.yaml
+kubectl --kubeconfig=./cluster1.yaml config use-context cluster1
+
+kubectl --kubeconfig=./cluster2.yaml config rename-cluster kubernetes cluster2
+sed -i 's/kubernetes-admin/cluster2-admin/g' cluster2.yaml
+
+export KUBECONFIG=$PWD/cluster1.yaml:$PWD/cluster2.yaml
+kubectl config get-contexts
+```
+
+(macOS: `sed -i '' 's/.../.../g' file`.)
+
 ## Check port 6443
 
 Linux:
@@ -895,17 +1026,23 @@ Test-NetConnection <VM_PUBLIC_IP> -Port 6443
 
 ## Check API server on VM
 
+**RUN ON: Azure VM**
+
 ```bash
 ss -lntp | grep 6443
 ```
 
 ## Check API server Pod
 
+**RUN ON: Azure VM**
+
 ```bash
 kubectl get pods -n kube-system -o wide | grep kube-apiserver
 ```
 
 ## Check certificate SAN
+
+**RUN ON: Azure VM**
 
 ```bash
 openssl x509 \
@@ -936,6 +1073,13 @@ kubectl --kubeconfig=cluster2.yaml cluster-info
 kubectl --kubeconfig=cluster1.yaml get nodes -v=6
 ```
 
+## TLS error like "x509: certificate signed by unknown authority" after fixing names
+
+If you renamed the cluster but forgot the user (or vice versa), a context can end
+up pairing cluster2's server with cluster1's client cert. Each cluster's admin
+cert is only valid against its own CA, so authentication fails. Make sure the
+cluster AND user are BOTH unique and correctly paired (PART 12).
+
 ---
 
 # FINAL CONCEPT
@@ -950,6 +1094,9 @@ One laptop:
              +---------+---------+
              |                   |
         context: cluster1   context: cluster2
+        cluster:  cluster1  cluster:  cluster2
+        user:     cluster1- user:     cluster2-
+                  admin               admin
              |                   |
              v                   v
        Azure VM-1           Azure VM-2
@@ -992,6 +1139,10 @@ KEY IDEA:
 A kubeconfig can contain multiple clusters, users, and contexts.
 
 A context determines which cluster and user kubectl uses.
+
+For a merge to work, the cluster name, the user name, AND the context name must
+be unique across the files. kubeadm names them all identically by default, so you
+must rename all three (PART 10–12) before merging.
 
 The two Kubernetes clusters do not need to communicate with each other.
 Only the laptop needs network access to each Kubernetes API server.
