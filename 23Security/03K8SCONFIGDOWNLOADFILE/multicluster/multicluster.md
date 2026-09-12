@@ -194,8 +194,10 @@ echo ""
 >
 > ```bash
 > KUBECONFIG=/home/azure/admin.conf kubectl config rename-context kubernetes-admin@kubernetes "$CN"
-> KUBECONFIG=/home/azure/admin.conf kubectl config rename-cluster kubernetes "$CN"
-> sed -i "s/kubernetes-admin/${CN}-admin/g" /home/azure/admin.conf
+> # kubectl has no rename-cluster / rename-user, so edit the cluster + user with sed:
+> sed -i "s/name: kubernetes\$/name: ${CN}/"        /home/azure/admin.conf
+> sed -i "s/cluster: kubernetes\$/cluster: ${CN}/"  /home/azure/admin.conf
+> sed -i "s/kubernetes-admin/${CN}-admin/g"         /home/azure/admin.conf
 > ```
 
 Save:
@@ -562,34 +564,33 @@ contexts to point at the same cluster after merging. Renaming the context (PART
 10–11) does **not** rename the underlying `cluster` and `user` objects, and
 those are what collide.
 
-`kubectl` provides `rename-cluster` but has **no `rename-user`** subcommand, so
-the user is renamed by editing the file directly. `kubernetes-admin` contains a
-hyphen, which never appears in base64 certificate/key data, so the `sed`
-substitution is safe.
+`kubectl config` has **only** `rename-context`. There is **no `rename-cluster`
+and no `rename-user`** subcommand — `rename-cluster` is just an open feature
+request (kubernetes/kubernetes#91623). So the cluster and the user are renamed by
+editing the file directly with `sed`.
 
-> On macOS, use `sed -i '' 's/.../.../g' file` instead of `sed -i 's/.../.../g' file`.
+This is safe because the patterns can only match the YAML key lines, never the
+base64 blobs: `: ` (colon-space) never appears in base64, and `kubernetes-admin`
+contains a hyphen, which never appears in base64 either. The `$` end-of-line
+anchor also stops `name: kubernetes` from matching `name: kubernetes-admin`.
+
+> On macOS, use `sed -i '' 's/.../.../' file` instead of `sed -i 's/.../.../' file`.
 > On Windows, run these in Git Bash (MINGW64), where `sed` is available.
 
 Cluster 1 — rename cluster, then user:
 
 ```bash
-kubectl --kubeconfig=./cluster1.yaml \
-config rename-cluster \
-kubernetes \
-cluster1
-
-sed -i 's/kubernetes-admin/cluster1-admin/g' cluster1.yaml
+sed -i 's/name: kubernetes$/name: cluster1/'       cluster1.yaml
+sed -i 's/cluster: kubernetes$/cluster: cluster1/' cluster1.yaml
+sed -i 's/kubernetes-admin/cluster1-admin/g'       cluster1.yaml
 ```
 
 Cluster 2 — rename cluster, then user:
 
 ```bash
-kubectl --kubeconfig=./cluster2.yaml \
-config rename-cluster \
-kubernetes \
-cluster2
-
-sed -i 's/kubernetes-admin/cluster2-admin/g' cluster2.yaml
+sed -i 's/name: kubernetes$/name: cluster2/'       cluster2.yaml
+sed -i 's/cluster: kubernetes$/cluster: cluster2/' cluster2.yaml
+sed -i 's/kubernetes-admin/cluster2-admin/g'       cluster2.yaml
 ```
 
 Verify each file now has fully unique names (**RUN ON: Laptop**):
@@ -997,18 +998,47 @@ names), then re-merge (PART 13). Example one-shot repair of already-downloaded
 files:
 
 ```bash
-kubectl --kubeconfig=./cluster1.yaml config rename-cluster kubernetes cluster1
-sed -i 's/kubernetes-admin/cluster1-admin/g' cluster1.yaml
+sed -i 's/name: kubernetes$/name: cluster1/'       cluster1.yaml
+sed -i 's/cluster: kubernetes$/cluster: cluster1/' cluster1.yaml
+sed -i 's/kubernetes-admin/cluster1-admin/g'       cluster1.yaml
 kubectl --kubeconfig=./cluster1.yaml config use-context cluster1
 
-kubectl --kubeconfig=./cluster2.yaml config rename-cluster kubernetes cluster2
-sed -i 's/kubernetes-admin/cluster2-admin/g' cluster2.yaml
+sed -i 's/name: kubernetes$/name: cluster2/'       cluster2.yaml
+sed -i 's/cluster: kubernetes$/cluster: cluster2/' cluster2.yaml
+sed -i 's/kubernetes-admin/cluster2-admin/g'       cluster2.yaml
 
 export KUBECONFIG=$PWD/cluster1.yaml:$PWD/cluster2.yaml
 kubectl config get-contexts
 ```
 
-(macOS: `sed -i '' 's/.../.../g' file`.)
+(macOS: `sed -i '' 's/.../.../' file`.)
+
+## Only ONE `server:` / cluster appears after `--flatten`, and one context says "Unauthorized"
+
+Symptom: `merged-config.yaml` contains a single cluster (one `server:` line) named
+`kubernetes`, both contexts reference it, the users are distinct, and one context
+works while the other returns `error: You must be logged in to the server
+(Unauthorized)`.
+
+Cause: you renamed the **users** but not the **clusters** before running
+`config view --flatten`. The two `kubernetes` clusters collided during the
+flatten, so only the first cluster's server + CA survived. The second context now
+points at the first cluster's server but presents the second cluster's client
+cert, which that API server's CA never signed — hence `Unauthorized`.
+
+Important: the second cluster's server address and CA are **already gone** from
+`merged-config.yaml`; you cannot repair it in place. Go back to the two original
+`cluster1.yaml` / `cluster2.yaml` files, apply the one-shot repair above (which
+renames the clusters too), then regenerate the flattened file:
+
+```bash
+grep server cluster1.yaml cluster2.yaml    # confirm two DIFFERENT IPs first
+KUBECONFIG=$PWD/cluster1.yaml:$PWD/cluster2.yaml kubectl config view --flatten > merged-config.yaml
+grep -c 'server:' merged-config.yaml       # must print 2
+```
+
+If `cluster2.yaml` is missing or shows the same IP as `cluster1.yaml`, re-download
+it from VM-2 (PART 8) and re-apply the rename before flattening.
 
 ## Check port 6443
 
