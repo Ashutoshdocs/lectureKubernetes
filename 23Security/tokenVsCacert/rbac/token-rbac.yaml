@@ -1,0 +1,28 @@
+# RBAC for Demo 1 (token-based ServiceAccount).
+# Authentication proves WHO you are; RBAC (authorization) decides WHAT you can do.
+# These are two independent stages — neither replaces the other.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: auth-demo
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: token-user-pod-reader
+  namespace: auth-demo
+subjects:
+# Note the subject KIND: for tokens we bind to a ServiceAccount object.
+- kind: ServiceAccount
+  name: token-user
+  namespace: auth-demo
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
