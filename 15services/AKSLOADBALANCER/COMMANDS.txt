@@ -1,0 +1,18 @@
+#variables set
+RESOURCE_GROUP="my-aks-rg" 
+AKS_CLUSTER="my-aks-cluster" 
+LOCATION="centralindia"
+
+#rg creation
+az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
+
+
+
+#aks cluster creation
+az aks create  --resource-group "$RESOURCE_GROUP"  --name "$AKS_CLUSTER" --location "$LOCATION"  --node-count 2 --node-vm-size Standard_B2s --generate-ssh-keys
+
+#download credentials
+az aks get-credentials  --resource-group "$RESOURCE_GROUP" --name "$AKS_CLUSTER" --file ./my-aks-cluster.yaml
+export KUBECONFIG="$PWD/my-aks-cluster.yaml"
+kubectl config get-contexts
+kubectl get nodes

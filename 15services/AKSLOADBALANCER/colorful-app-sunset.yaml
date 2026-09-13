@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sunset-content
+  labels:
+    app: sunset
+data:
+  default.conf: |
+    server {
+        listen 80;
+        listen 8080;
+        server_name _;
+        location / {
+            root  /usr/share/nginx/html;
+            index index.html;
+        }
+    }
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Sunset • AKS LoadBalancer Demo</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          min-height: 100vh;
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          background: linear-gradient(-45deg, #ff512f, #f09819, #ff6a00, #ee0979);
+          background-size: 400% 400%;
+          animation: gradientShift 12s ease infinite;
+        }
+        @keyframes gradientShift {
+          0%   { background-position: 0% 50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .blob {
+          position: fixed;
+          border-radius: 50%;
+          filter: blur(60px);
+          opacity: 0.55;
+          animation: float 9s ease-in-out infinite;
+        }
+        .blob.one   { width: 320px; height: 320px; background: #fff200; top: -80px; left: -60px; }
+        .blob.two   { width: 260px; height: 260px; background: #ff3cac; bottom: -70px; right: -40px; animation-delay: 3s; }
+        .blob.three { width: 200px; height: 200px; background: #ffdde1; top: 40%; right: 15%; animation-delay: 6s; }
+        @keyframes float {
+          0%,100% { transform: translateY(0) scale(1); }
+          50%     { transform: translateY(-40px) scale(1.1); }
+        }
+        .card {
+          position: relative;
+          z-index: 2;
+          text-align: center;
+          padding: 3rem 3.5rem;
+          border-radius: 28px;
+          background: rgba(255,255,255,0.15);
+          backdrop-filter: blur(18px);
+          -webkit-backdrop-filter: blur(18px);
+          border: 1px solid rgba(255,255,255,0.35);
+          box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+          color: #fff;
+          max-width: 90vw;
+        }
+        h1 {
+          font-size: 3.2rem;
+          letter-spacing: 2px;
+          text-shadow: 0 4px 24px rgba(0,0,0,0.35);
+          margin-bottom: .5rem;
+        }
+        .emoji { font-size: 4rem; display: block; margin-bottom: 1rem; animation: spin 8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .tag {
+          display: inline-block;
+          margin-top: 1.2rem;
+          padding: .5rem 1.2rem;
+          border-radius: 999px;
+          background: rgba(0,0,0,0.25);
+          font-size: .95rem;
+          letter-spacing: 1px;
+        }
+        .meta { margin-top: 1.5rem; font-size: 1rem; opacity: .95; line-height: 1.7; }
+        .meta code { background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 6px; }
+      </style>
+    </head>
+    <body>
+      <div class="blob one"></div>
+      <div class="blob two"></div>
+      <div class="blob three"></div>
+      <div class="card">
+        <span class="emoji">🌅</span>
+        <h1>SUNSET APP</h1>
+        <div class="tag">Served by AKS &nbsp;•&nbsp; type: LoadBalancer</div>
+        <div class="meta">
+          You reached this page through: <code id="host">…</code><br>
+          Port: <code id="port">…</code>
+        </div>
+      </div>
+      <script>
+        document.getElementById('host').textContent = location.hostname;
+        document.getElementById('port').textContent = location.port || '80';
+      </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sunset
+  labels:
+    app: sunset
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sunset
+  template:
+    metadata:
+      labels:
+        app: sunset
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+            - containerPort: 8080
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "128Mi" }
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: content
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
+            - name: content
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: content
+          configMap:
+            name: sunset-content
+---
+# Service #1 — external LoadBalancer on port 80
+apiVersion: v1
+kind: Service
+metadata:
+  name: sunset-lb-primary
+  labels:
+    app: sunset
+spec:
+  type: LoadBalancer
+  selector:
+    app: sunset
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+# Service #2 — a second LoadBalancer on port 8080 (its own public IP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sunset-lb-secondary
+  labels:
+    app: sunset
+spec:
+  type: LoadBalancer
+  selector:
+    app: sunset
+  ports:
+    - name: http-alt
+      port: 80
+      targetPort: 8080
