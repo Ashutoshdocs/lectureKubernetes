@@ -17,4 +17,7 @@ az ad sp create-for-rbac --name github-aks-deployer --role Contributor --scopes 
 az aks create  --resource-group "$RESOURCE_GROUP"  --name "$AKS_CLUSTER" --location "$LOCATION"  --node-count 2 --node-vm-size Standard_B2s --generate-ssh-keys
 
 #download credentials
-az aks get-credentials --resource-group "$RESOURCE_GROUP" --name "$AKS_CLUSTER"
+az aks get-credentials  --resource-group "$RESOURCE_GROUP" --name "$AKS_CLUSTER" --file ./my-aks-cluster.yaml
+export KUBECONFIG="$PWD/my-aks-cluster.yaml"
+kubectl config get-contexts
+kubectl get nodes
