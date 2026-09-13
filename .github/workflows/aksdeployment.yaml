@@ -1,19 +1,13 @@
-name: Execute kubectl Command on AKS
+name: Deploy Application to AKS
 
 on:
   workflow_dispatch:
-    inputs:
-      kubectl_command:
-        description: "Enter kubectl command to execute"
-        required: true
-        type: string
 
 env:
   RESOURCE_GROUP: my-aks-rg
   AKS_CLUSTER: my-aks-cluster
 
 jobs:
-
   deploy:
     runs-on: ubuntu-latest
 
@@ -29,7 +23,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3. Connect to AKS
+      # 3. Connect to existing AKS cluster
       - name: Set AKS Context
         uses: azure/aks-set-context@v4
         with:
@@ -43,12 +37,27 @@ jobs:
       # 5. Check AKS connection
       - name: Check AKS
         run: |
+          echo "Connected to AKS:"
+          kubectl cluster-info
+
+          echo "AKS Nodes:"
           kubectl get nodes
 
-      # 6. Execute user's kubectl command
-      - name: Execute kubectl command
+      # 6. Deploy Kubernetes manifests
+      - name: Deploy Application
         run: |
-          echo "Executing:"
-          echo "${{ inputs.kubectl_command }}"
+          echo "Deploying Kubernetes manifests..."
 
-          ${{ inputs.kubectl_command }}
+          kubectl apply -f 17aksdirectdeployment/
+
+      # 7. Verify deployment
+      - name: Verify Deployment
+        run: |
+          echo "Deployments:"
+          kubectl get deployments
+
+          echo "Pods:"
+          kubectl get pods
+
+          echo "Services:"
+          kubectl get services
