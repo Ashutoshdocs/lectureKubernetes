@@ -1,3 +1,109 @@
+# ============================================================
+#  webapp — nginx serving a custom "Deployed via GitHub Actions" page
+#  The page HTML lives in the ConfigMap below and is mounted into nginx.
+#  To PROVE a new deploy went out, bump the version marker (see 👇 CHANGE ME).
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-html
+  namespace: default
+  labels:
+    app: webapp
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Deployed 🚀</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+          color: #fff;
+          text-align: center;
+          overflow: hidden;
+          background: linear-gradient(-45deg, #ff0080, #ff8c00, #40e0d0, #7b2ff7, #ff0080);
+          background-size: 400% 400%;
+          animation: gradientShift 12s ease infinite;
+        }
+        @keyframes gradientShift {
+          0%   { background-position: 0% 50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .rocket {
+          font-size: 5rem;
+          animation: shake 0.7s ease-in-out infinite;
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateY(0) rotate(-8deg); }
+          25%      { transform: translateY(-14px) rotate(6deg); }
+          50%      { transform: translateY(0) rotate(-8deg); }
+          75%      { transform: translateY(-6px) rotate(4deg); }
+        }
+        h1 {
+          font-size: clamp(2rem, 6vw, 4rem);
+          margin: 0.4em 0 0.2em;
+          text-shadow: 3px 3px 0 rgba(0,0,0,0.25);
+          animation: pop 2s ease-in-out infinite;
+        }
+        @keyframes pop {
+          0%, 100% { transform: scale(1); }
+          50%      { transform: scale(1.06); }
+        }
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          background: rgba(0,0,0,0.55);
+          padding: 14px 26px;
+          border-radius: 999px;
+          font-size: 1.1rem;
+          font-weight: 600;
+          margin-top: 10px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+          animation: glow 2.5s ease-in-out infinite;
+        }
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 12px rgba(255,255,255,0.4); }
+          50%      { box-shadow: 0 0 34px rgba(255,255,255,0.9); }
+        }
+        .version {
+          margin-top: 26px;
+          font-size: 1.6rem;
+          font-weight: 800;
+          letter-spacing: 1px;
+          background: rgba(255,255,255,0.18);
+          padding: 10px 22px;
+          border-radius: 14px;
+          backdrop-filter: blur(6px);
+        }
+        .sub { margin-top: 14px; opacity: 0.9; font-size: 1rem; }
+      </style>
+    </head>
+    <body>
+      <div class="rocket">🚀</div>
+      <h1>Deployment Successful!</h1>
+      <div class="badge">⚙️ Shipped via GitHub Actions</div>
+
+      <!-- 👇👇👇  CHANGE ME TO PROVE A NEW DEPLOY WENT OUT  👇👇👇 -->
+      <div class="version">Build v1.0.0</div>
+      <!-- 👆👆👆  Bump this number, commit, and watch it change live  👆👆👆 -->
+
+      <p class="sub">If you can read a new version number, the pipeline works. ✅</p>
+    </body>
+    </html>
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,6 +122,10 @@ spec:
     metadata:
       labels:
         app: webapp
+      annotations:
+        # 👇 CHANGE ME (or let CI set it) to FORCE pods to restart on every deploy.
+        # ConfigMap edits alone do NOT restart pods — this annotation does.
+        deploy/revision: "1"
 
     spec:
       containers:
@@ -23,6 +133,12 @@ spec:
           image: nginx:1.27
           ports:
             - containerPort: 80
+
+          # Mount the HTML page from the ConfigMap into nginx's web root
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+              readOnly: true
 
           resources:
             requests:
@@ -45,3 +161,8 @@ spec:
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 20
+
+      volumes:
+        - name: html
+          configMap:
+            name: webapp-html
