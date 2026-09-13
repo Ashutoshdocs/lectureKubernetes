@@ -1,6 +1,3 @@
-az ad sp create-for-rbac --name github-aks-deployer --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>
-
-
 #variables set
 RESOURCE_GROUP="my-aks-rg" 
 AKS_CLUSTER="my-aks-cluster" 
@@ -8,6 +5,13 @@ LOCATION="centralindia"
 
 #rg creation
 az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
+
+
+#sp : variable name : AZURE_CREDENTIALS
+az ad sp create-for-rbac --name github-aks-deployer --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>
+
+
+
 
 #aks cluster creation
 az aks create  --resource-group "$RESOURCE_GROUP"  --name "$AKS_CLUSTER" --location "$LOCATION"  --node-count 2 --node-vm-size Standard_B2s --generate-ssh-keys
