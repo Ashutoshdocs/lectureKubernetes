@@ -68,6 +68,12 @@ kind load docker-image your-registry/k8s-resilience-demo:1.0
 
 # minikube
 minikube image load your-registry/k8s-resilience-demo:1.0
+
+
+#k8s.io
+docker save k8s-resilience-demo:1.0 -o k8s-resilience-demo.tar
+sudo ctr -n k8s.io images import k8s-resilience-demo.tar
+sudo ctr -n k8s.io images list | grep k8s-resilience-demo
 ```
 
 > The Deployment uses `imagePullPolicy: IfNotPresent`, so locally loaded images
