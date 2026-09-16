@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mount-demo
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep infinity"]
+      volumeMounts:
+        # (A) Whole ConfigMap mounted as a folder — this AUTO-UPDATES
+        - name: config-vol
+          mountPath: /etc/config
+
+        # (B) A single key mounted via subPath — this DOES NOT update
+        - name: config-vol
+          mountPath: /etc/single/theme
+          subPath: theme
+  volumes:
+    - name: config-vol
+      configMap:
+        name: web-config

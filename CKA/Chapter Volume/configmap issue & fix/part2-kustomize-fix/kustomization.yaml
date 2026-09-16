@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+
+# configMapGenerator builds the ConfigMap for us AND appends a hash of its
+# contents to the name. Change any value below and the hash (and therefore the
+# name) changes, which changes the Deployment -> Kubernetes rolls out new Pods.
+configMapGenerator:
+  - name: app-config
+    literals:
+      - theme=dark          # <-- change this to "light" to see a rollout happen
+      - title=My Web App

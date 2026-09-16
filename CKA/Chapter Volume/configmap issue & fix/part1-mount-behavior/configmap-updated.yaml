@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+data:
+  theme: light          # <-- changed from "dark"
+  title: "My Web App"

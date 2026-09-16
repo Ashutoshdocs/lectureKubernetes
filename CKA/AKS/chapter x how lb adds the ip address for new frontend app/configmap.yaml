@@ -1,0 +1,190 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: color-web-app
+  labels:
+    app: color-web
+data:
+  app.py: |
+    #!/usr/bin/env python3
+    """
+    Tiny self-identifying web server for the Kubernetes load-balancing demo.
+
+    Each pod renders a page in a colour derived from its own name, so different
+    pods look unmistakably different in the browser. That makes it obvious at a
+    glance which backend pod actually served the request.
+
+    Standard library only - no pip install, no image build required. The pod's
+    identity comes in through the Downward API (see deployment.yaml).
+    """
+    import hashlib
+    import os
+    import socket
+    from datetime import datetime, timezone
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    POD_NAME = os.environ.get("POD_NAME", socket.gethostname())
+    NODE_NAME = os.environ.get("NODE_NAME", "unknown-node")
+    POD_IP = os.environ.get("POD_IP", "0.0.0.0")
+    PORT = int(os.environ.get("PORT", "8080"))
+
+    # How many times THIS pod has served the page. Refreshing in a browser that
+    # keeps the TCP connection open makes this number climb on one pod only - which
+    # is the whole point of the demo.
+    hits = 0
+
+
+    def hue_for(text: str) -> int:
+        """Deterministically map a pod name to a hue on the colour wheel."""
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        return int(digest[:8], 16) % 360
+
+
+    def page(host_hint: str) -> bytes:
+        h = hue_for(POD_NAME)
+        accent = f"hsl({h}, 85%, 62%)"
+        accent_soft = f"hsl({(h + 35) % 360}, 80%, 58%)"
+        bg = f"hsl({h}, 32%, 7%)"
+        bg2 = f"hsl({(h + 20) % 360}, 40%, 11%)"
+        served = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+
+        html = f"""<!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{POD_NAME}</title>
+    <style>
+      :root {{
+        --accent: {accent};
+        --accent-soft: {accent_soft};
+        --bg: {bg};
+        --bg2: {bg2};
+      }}
+      * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+      html, body {{ height: 100%; }}
+      body {{
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(1200px 800px at 50% -10%, var(--bg2), var(--bg) 60%);
+        color: #f4f5f7;
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 6vh 5vw;
+        overflow-x: hidden;
+      }}
+      .stage {{
+        width: min(680px, 100%);
+        text-align: center;
+        position: relative;
+      }}
+      .orb {{
+        width: 172px; height: 172px;
+        margin: 0 auto 2.4rem;
+        border-radius: 50%;
+        background: radial-gradient(circle at 32% 30%, var(--accent), var(--accent-soft) 70%);
+        box-shadow: 0 0 0 1px rgba(255,255,255,.08),
+                    0 0 70px -6px var(--accent),
+                    0 0 140px -20px var(--accent-soft);
+        animation: pulse 3.4s ease-in-out infinite;
+      }}
+      @keyframes pulse {{
+        0%, 100% {{ transform: scale(1); filter: brightness(1); }}
+        50%      {{ transform: scale(1.05); filter: brightness(1.12); }}
+      }}
+      .kicker {{
+        font-size: .82rem;
+        letter-spacing: .04em;
+        color: #aeb2bd;
+        margin-bottom: .9rem;
+      }}
+      .podname {{
+        font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+        font-size: clamp(1.5rem, 5.5vw, 3rem);
+        font-weight: 600;
+        line-height: 1.15;
+        color: var(--accent);
+        word-break: break-all;
+        text-shadow: 0 0 40px color-mix(in srgb, var(--accent) 45%, transparent);
+      }}
+      .meta {{
+        margin-top: 2.6rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1px;
+        background: rgba(255,255,255,.07);
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        overflow: hidden;
+      }}
+      .cell {{
+        background: rgba(255,255,255,.02);
+        padding: 1.1rem 1rem;
+        text-align: left;
+      }}
+      .cell .label {{ font-size: .72rem; color: #8b90a0; margin-bottom: .35rem; }}
+      .cell .value {{
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: .95rem;
+        color: #e8eaf0;
+        word-break: break-all;
+      }}
+      .hits {{
+        margin-top: 1.8rem;
+        font-size: .9rem;
+        color: #aeb2bd;
+      }}
+      .hits b {{
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 1.15rem;
+        color: var(--accent);
+      }}
+      .foot {{ margin-top: 2.4rem; font-size: .78rem; color: #6b7080; }}
+      @media (prefers-reduced-motion: reduce) {{
+        .orb {{ animation: none; }}
+      }}
+    </style>
+    </head>
+    <body>
+      <main class="stage">
+        <div class="orb"></div>
+        <p class="kicker">you reached this pod</p>
+        <h1 class="podname">{POD_NAME}</h1>
+        <section class="meta">
+          <div class="cell"><div class="label">node</div><div class="value">{NODE_NAME}</div></div>
+          <div class="cell"><div class="label">pod IP</div><div class="value">{POD_IP}</div></div>
+          <div class="cell"><div class="label">served at</div><div class="value">{served}</div></div>
+        </section>
+        <p class="hits">this pod has answered <b>{hits}</b> request(s)</p>
+        <p class="foot">refresh in the browser vs. curl in a loop &mdash; watch which pod answers</p>
+      </main>
+    </body>
+    </html>"""
+        return html.encode("utf-8")
+
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            global hits
+            if self.path in ("/healthz", "/readyz"):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"ok")
+                return
+            hits += 1
+            body = page(self.headers.get("Host", ""))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("X-Pod-Name", POD_NAME)  # easy to grep with curl -I
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, fmt, *args):
+            print(f"[{POD_NAME}] {self.address_string()} - {fmt % args}", flush=True)
+
+
+    if __name__ == "__main__":
+        print(f"serving {POD_NAME} on :{PORT} (node={NODE_NAME}, ip={POD_IP})", flush=True)
+        ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
