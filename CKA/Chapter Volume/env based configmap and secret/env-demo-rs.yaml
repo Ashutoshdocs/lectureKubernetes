@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: env-demo-rs
+  labels:
+    app: env-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: env-demo
+  template:
+    metadata:
+      labels:
+        app: env-demo
+    spec:
+      containers:
+      - name: demo-container
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        # ---- Values injected from ConfigMap ----
+        env:
+        - name: COLOR
+          valueFrom:
+            configMapKeyRef:
+              name: my-config
+              key: APP_COLOR
+
+        - name: MODE
+          valueFrom:
+            configMapKeyRef:
+              name: my-config
+              key: APP_MODE
+
+        # ---- Values injected from Secret ----
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: my-secret
+              key: DB_USER
+
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: my-secret
+              key: DB_PASS
+
+        # ---- Generate an index.html from the env vars, then start nginx ----
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            cat > /usr/share/nginx/html/index.html <<EOF
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Kubernetes Env Demo</title>
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                  min-height: 100vh;
+                  display: flex; align-items: center; justify-content: center;
+                  background: linear-gradient(135deg, $COLOR 0%, #16161e 100%);
+                  color: #ffffff; padding: 24px;
+                }
+                .card {
+                  background: rgba(255,255,255,0.08);
+                  -webkit-backdrop-filter: blur(14px);
+                  backdrop-filter: blur(14px);
+                  border: 1px solid rgba(255,255,255,0.18);
+                  border-radius: 22px;
+                  padding: 40px;
+                  width: 100%; max-width: 560px;
+                  box-shadow: 0 24px 70px rgba(0,0,0,0.4);
+                }
+                h1 { font-size: 1.75rem; margin-bottom: 6px; }
+                .sub { opacity: 0.75; font-size: 0.95rem; margin-bottom: 22px; }
+                .badge {
+                  display: inline-block; padding: 6px 16px; border-radius: 999px;
+                  background: $COLOR; color: #fff; font-weight: 700;
+                  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px;
+                  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+                }
+                .group-title {
+                  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.5px;
+                  opacity: 0.6; margin: 26px 0 12px;
+                }
+                .row {
+                  display: flex; justify-content: space-between; align-items: center;
+                  padding: 14px 18px; margin-bottom: 10px;
+                  background: rgba(0,0,0,0.22); border-radius: 14px;
+                }
+                .key { opacity: 0.85; }
+                .val { font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; }
+                .swatch {
+                  display: inline-block; width: 16px; height: 16px; border-radius: 5px;
+                  background: $COLOR; vertical-align: middle; margin-left: 8px;
+                  border: 1px solid rgba(255,255,255,0.5);
+                }
+                footer { margin-top: 28px; font-size: 0.8rem; opacity: 0.55; text-align: center; line-height: 1.5; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h1>&#9881;&#65039; Kubernetes Env Demo</h1>
+                <p class="sub">Values injected into this Pod from a ConfigMap and a Secret</p>
+                <span class="badge">$MODE</span>
+
+                <div class="group-title">&#128216; From ConfigMap &mdash; my-config</div>
+                <div class="row"><span class="key">APP_COLOR</span><span class="val">$COLOR<span class="swatch"></span></span></div>
+                <div class="row"><span class="key">APP_MODE</span><span class="val">$MODE</span></div>
+
+                <div class="group-title">&#128272; From Secret &mdash; my-secret</div>
+                <div class="row"><span class="key">DB_USER</span><span class="val">$DB_USER</span></div>
+                <div class="row"><span class="key">DB_PASS</span><span class="val">$DB_PASS</span></div>
+
+                <footer>Served by nginx &bull; update the ConfigMap / Secret and recreate the Pod to see this page change</footer>
+              </div>
+            </body>
+            </html>
+            EOF
+            exec nginx -g 'daemon off;'

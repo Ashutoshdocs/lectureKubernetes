@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mount-demo
+  labels:
+    app: mount-demo          # needed so the NodePort Service can select this pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: config-vol
+      mountPath: /etc/config     # web-config ConfigMap mounted here as files
+    - name: secret-vol
+      mountPath: /etc/secret     # db-secret Secret mounted here as files
+    # Regenerate the web page from the MOUNTED FILES every few seconds.
+    # Because volume-mounted ConfigMaps/Secrets auto-update, a browser refresh
+    # will show changes WITHOUT recreating the pod.
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        while true; do
+          THEME=$(cat /etc/config/theme 2>/dev/null || echo unknown)
+          TITLE=$(cat /etc/config/title 2>/dev/null || echo "Web App")
+          DBUSER=$(cat /etc/secret/username 2>/dev/null || echo n/a)
+          DBPASS=$(cat /etc/secret/password 2>/dev/null || echo n/a)
+          if [ "$THEME" = "light" ]; then
+            BG="#eef1f6"; GRAD="#d7e0f0"; FG="#1d1d1f"; SUB="#5b5b63"; CARD="#ffffff"; LINE="#e4e7ee"; ACCENT="#0071e3";
+          else
+            BG="#12121a"; GRAD="#1e1e2e"; FG="#ffffff"; SUB="#b8b8c4"; CARD="rgba(255,255,255,0.06)"; LINE="rgba(255,255,255,0.12)"; ACCENT="#7c5cff";
+          fi
+          cat > /usr/share/nginx/html/index.html <<EOF
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="refresh" content="5">
+          <title>$TITLE</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              min-height: 100vh; display: flex; align-items: center; justify-content: center;
+              background: linear-gradient(135deg, $BG 0%, $GRAD 100%);
+              color: $FG; padding: 24px; transition: background .4s ease;
+            }
+            .card {
+              background: $CARD; border: 1px solid $LINE; border-radius: 22px;
+              padding: 40px; width: 100%; max-width: 560px;
+              box-shadow: 0 24px 70px rgba(0,0,0,0.25);
+              -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+            }
+            h1 { font-size: 1.7rem; margin-bottom: 6px; }
+            .sub { color: $SUB; font-size: 0.95rem; margin-bottom: 20px; }
+            .badge {
+              display: inline-block; padding: 6px 16px; border-radius: 999px;
+              background: $ACCENT; color: #fff; font-weight: 700; font-size: 0.8rem;
+              text-transform: uppercase; letter-spacing: 1.5px;
+            }
+            .group-title {
+              font-size: 0.76rem; text-transform: uppercase; letter-spacing: 1.5px;
+              color: $SUB; margin: 26px 0 12px;
+            }
+            .row {
+              display: flex; justify-content: space-between; align-items: center;
+              padding: 14px 18px; margin-bottom: 10px;
+              background: rgba(127,127,127,0.12); border-radius: 14px;
+            }
+            .key { color: $SUB; }
+            .val { font-weight: 700; font-family: "SF Mono", Menlo, Consolas, monospace; color: $FG; }
+            footer { margin-top: 26px; font-size: 0.8rem; color: $SUB; text-align: center; line-height: 1.5; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>&#128194; $TITLE</h1>
+            <p class="sub">Values mounted into this Pod as files from a ConfigMap and a Secret</p>
+            <span class="badge">theme: $THEME</span>
+
+            <div class="group-title">&#128216; From ConfigMap &mdash; web-config &nbsp;(/etc/config)</div>
+            <div class="row"><span class="key">theme</span><span class="val">$THEME</span></div>
+            <div class="row"><span class="key">title</span><span class="val">$TITLE</span></div>
+
+            <div class="group-title">&#128272; From Secret &mdash; db-secret &nbsp;(/etc/secret)</div>
+            <div class="row"><span class="key">username</span><span class="val">$DBUSER</span></div>
+            <div class="row"><span class="key">password</span><span class="val">$DBPASS</span></div>
+
+            <footer>Auto-refreshes every 5s &bull; edit the ConfigMap/Secret and this page updates <b>without</b> restarting the pod</footer>
+          </div>
+        </body>
+        </html>
+        EOF
+          sleep 5
+        done &
+        exec nginx -g 'daemon off;'
+  volumes:
+  - name: config-vol
+    configMap:
+      name: web-config
+  - name: secret-vol
+    secret:
+      secretName: db-secret
