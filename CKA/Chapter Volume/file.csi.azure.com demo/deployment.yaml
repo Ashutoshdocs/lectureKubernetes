@@ -1,0 +1,72 @@
+# =============================================================================
+# Azure Blob container mounted as nginx web root, via the Blob CSI driver.
+# Replace the <PLACEHOLDERS> with your own values before applying.
+# Order: this file has 3 objects -> PersistentVolume, PVC, Deployment.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: blob-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain   # do NOT delete the blob container on cleanup
+  storageClassName: ""                     # empty = static binding (no dynamic provisioning)
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=0    # 0 = pick up edited files almost immediately (demo)
+  csi:
+    driver: blob.csi.azure.com
+    # volumeHandle just has to be unique within the cluster
+    volumeHandle: blob-pv-handle-01
+    volumeAttributes:
+      resourceGroup: <RESOURCE_GROUP>      # RG that holds the storage account
+      storageAccount: <STORAGE_ACCOUNT>    # storage account name
+      containerName: <CONTAINER_NAME>      # the blob container holding index.html + images
+    nodeStageSecretRef:
+      name: azure-blob-secret              # created via kubectl (see README, holds the account key)
+      namespace: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blob-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: blob-pv                       # bind directly to the PV above
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-blob
+  labels:
+    app: nginx-blob
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-blob
+  template:
+    metadata:
+      labels:
+        app: nginx-blob
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: blob-vol
+          mountPath: /usr/share/nginx/html   # nginx serves whatever is in the blob container
+      volumes:
+      - name: blob-vol
+        persistentVolumeClaim:
+          claimName: blob-pvc

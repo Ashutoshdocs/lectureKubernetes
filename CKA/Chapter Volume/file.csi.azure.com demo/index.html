@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Azure Blob → nginx Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0078d4 0%, #16161e 100%);
+      color: #fff; padding: 24px;
+    }
+    .card {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 22px; padding: 36px; max-width: 640px; width: 100%; text-align: center;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.4); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .sub { opacity: .8; margin-bottom: 22px; }
+    img { max-width: 100%; border-radius: 16px; box-shadow: 0 12px 34px rgba(0,0,0,.4); }
+    .now { margin-top: 18px; font-family: monospace; font-weight: 700; }
+    footer { margin-top: 20px; font-size: .82rem; opacity: .6; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>&#9729;&#65039; Served from Azure Blob Storage</h1>
+    <p class="sub">This page and image are mounted into nginx from a storage-account container</p>
+
+    <!-- CHANGE THE IMAGE: edit "image1.png" below to "image2.png" (in the blob), then refresh -->
+    <img src="image1.png" alt="demo image">
+    <p class="now">currently showing: image1.png</p>
+
+    <footer>Edit index.html in the Azure container (image1.png &harr; image2.png)<br>save it, then refresh this page.</footer>
+  </div>
+</body>
+</html>
