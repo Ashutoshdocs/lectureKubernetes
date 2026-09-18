@@ -1,0 +1,39 @@
+# ============================================================================
+# 03 - ENCRYPTION AT REST (etcd)
+# ============================================================================
+# By default, Kubernetes stores Secret objects UNENCRYPTED in etcd. Anyone who
+# can read the etcd datastore on a control-plane node (or an etcd backup) can
+# read every secret. This config tells the kube-apiserver to ENCRYPT Secrets
+# before writing them to etcd.
+#
+# WHERE THIS GOES (self-managed clusters only):
+#   * Place this file on each control-plane node, e.g.
+#       /etc/kubernetes/enc/encryption-config.yaml
+#   * Add to kube-apiserver (/etc/kubernetes/manifests/kube-apiserver.yaml):
+#       --encryption-provider-config=/etc/kubernetes/enc/encryption-config.yaml
+#   * Mount the file into the apiserver pod, then restart the apiserver.
+#   * Re-encrypt existing secrets:
+#       kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+#
+# NOTE for managed clusters (AKS / EKS / GKE): the cloud provider manages the
+# control plane, so you enable encryption-at-rest through the provider instead.
+# On AKS, use "KMS etcd encryption" backed by Azure Key Vault (see stage 04).
+#
+# Generate the 32-byte key below with:
+#   head -c 32 /dev/urandom | base64
+# ============================================================================
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets
+    providers:
+      # aescbc encrypts Secrets before they are written to etcd.
+      - aescbc:
+          keys:
+            - name: key1
+              # <<< PLACEHOLDER >>> replace with your own base64 32-byte key.
+              secret: REPLACE_WITH_BASE64_32_BYTE_KEY==
+      # identity = no encryption. Listed LAST so new writes use aescbc, while
+      # existing plaintext secrets can still be read during migration.
+      - identity: {}

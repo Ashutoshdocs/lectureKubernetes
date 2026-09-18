@@ -1,0 +1,53 @@
+# ============================================================================
+# 01 - NATIVE KUBERNETES SECRET  --  frontend deployment
+# ============================================================================
+# The frontend reads the SQL password from the same Secret.
+# This YAML is SAFE to commit to Git: it contains no secret value.
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+    demo-stage: "01-native-secret"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          env:
+            - name: SQL_HOST
+              value: "sql"
+            - name: SQL_USER
+              value: "sa"
+            # ---- Password pulled from the Secret, not hard-coded ----
+            - name: SQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql-secret
+                  key: MSSQL_SA_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80

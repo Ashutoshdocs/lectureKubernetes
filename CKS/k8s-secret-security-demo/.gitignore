@@ -1,0 +1,15 @@
+# Never commit real secret material.
+# Sealed Secrets (stage 02) and SecretProviderClass (stage 04) are safe to commit.
+
+# Plain / base64 Secret manifests generated locally (stage 01)
+*secret*.local.yaml
+sql-secret.plain.yaml
+
+# etcd encryption key material (stage 03)
+encryption-config.local.yaml
+*.key
+
+# Azure / kubeconfig / env
+.env
+*.pem
+kubeconfig*

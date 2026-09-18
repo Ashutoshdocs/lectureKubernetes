@@ -1,0 +1,83 @@
+# ============================================================================
+# 04 - AZURE KEY VAULT  --  SQL deployment
+# ============================================================================
+# Two things happen here:
+#   1. The CSI volume mounts the SecretProviderClass. Mounting is what triggers
+#      the driver to fetch from Key Vault AND to create the synced `sql-secret`.
+#   2. The password is injected as an env var via secretKeyRef from that
+#      synced Secret -- no secret value anywhere in this file or in Git.
+#
+# The ServiceAccount must be annotated/labeled for Azure Workload Identity
+# (see the ServiceAccount below + README).
+# ============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload-identity-sa
+  namespace: default
+  labels:
+    azure.workload.identity/use: "true"
+  annotations:
+    # Client ID of the user-assigned managed identity federated to this SA.
+    azure.workload.identity/client-id: "<AZURE_WORKLOAD_IDENTITY_CLIENT_ID>"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql
+  labels:
+    app: sql
+    demo-stage: "04-azure-key-vault"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sql
+  template:
+    metadata:
+      labels:
+        app: sql
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: workload-identity-sa
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_PID
+              value: "Developer"
+            # ---- Password from the CSI-synced Secret ----
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql-secret
+                  key: MSSQL_SA_PASSWORD
+          volumeMounts:
+            # Mounting is REQUIRED for the driver to fetch + sync the Secret.
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-sql-kv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql
+  labels:
+    app: sql
+spec:
+  selector:
+    app: sql
+  ports:
+    - port: 1433
+      targetPort: 1433

@@ -1,0 +1,59 @@
+# ============================================================================
+# 00 - THE PROBLEM (DO NOT USE IN PRODUCTION)
+# ============================================================================
+# The SQL password is hard-coded in PLAIN TEXT directly in the Deployment.
+#
+# Why this is dangerous:
+#   * Anyone who can `kubectl get deploy sql -o yaml` sees the password.
+#   * The password ends up in the YAML file on the node / in your Git repo.
+#   * If this file is pushed to GitHub, the secret is leaked to everyone
+#     with read access to the repo (and forever in git history).
+#
+# This file exists ONLY to demonstrate the vulnerability.
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql
+  labels:
+    app: sql
+    demo-stage: "00-insecure"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sql
+  template:
+    metadata:
+      labels:
+        app: sql
+    spec:
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            # ---------------------------------------------------------------
+            # !!! THE VULNERABILITY !!!
+            # Plain-text password, committed to Git, visible to everyone.
+            # ---------------------------------------------------------------
+            - name: MSSQL_SA_PASSWORD
+              value: "P@ssw0rd-VERY-INSECURE-123"
+            - name: MSSQL_PID
+              value: "Developer"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql
+  labels:
+    app: sql
+spec:
+  selector:
+    app: sql
+  ports:
+    - port: 1433
+      targetPort: 1433

@@ -1,0 +1,52 @@
+# ============================================================================
+# 01 - NATIVE KUBERNETES SECRET  --  SQL deployment
+# ============================================================================
+# The password is now injected from the Secret via secretKeyRef.
+# This YAML is SAFE to commit to Git: it contains no secret value.
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql
+  labels:
+    app: sql
+    demo-stage: "01-native-secret"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sql
+  template:
+    metadata:
+      labels:
+        app: sql
+    spec:
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_PID
+              value: "Developer"
+            # ---- Password pulled from the Secret, not hard-coded ----
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql-secret
+                  key: MSSQL_SA_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql
+  labels:
+    app: sql
+spec:
+  selector:
+    app: sql
+  ports:
+    - port: 1433
+      targetPort: 1433
