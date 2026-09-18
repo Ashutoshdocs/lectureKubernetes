@@ -1,0 +1,57 @@
+# =============================================================================
+# lifecycle-of-volume: a 2-container pod sharing a hostPath volume
+# =============================================================================
+# Two containers (nginx + sidecar) mount the SAME hostPath volume at /shared,
+# which maps to /data/shared on the node. The sidecar appends a timestamp to
+# /shared/sidecar.log every 5s.
+#
+# This pod lets us contrast TWO storage locations with very different lifetimes:
+#   1. /shared              -> hostPath VOLUME  (lives on the NODE)
+#   2. the container rootfs  -> writable layer   (lives in the CONTAINER)
+#
+# When we `crictl stop` the containers, the kubelet restarts them (restartPolicy
+# defaults to Always). We will PROVE:
+#   - data in /shared        SURVIVES the container restart  (volume lifecycle)
+#   - data in the rootfs      is LOST on the container restart (container lifecycle)
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-sidecar
+  labels:
+    demo: lifecycle-of-volume
+spec:
+  # restartPolicy: Always is the default for a Pod - shown here for clarity.
+  # It's why the kubelet re-creates a container the moment crictl stops it.
+  restartPolicy: Always
+  containers:
+    - name: nginx
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-storage
+          mountPath: /shared
+
+    - name: sidecar
+      image: busybox:latest
+      command:
+        - sh
+        - -c
+        - |
+          # Marker written to the VOLUME every time this container (re)starts.
+          echo "=== sidecar container STARTED at $(date -u) ===" >> /shared/sidecar.log
+          while true; do
+            echo "Sidecar is running..."
+            date >> /shared/sidecar.log
+            sleep 5
+          done
+      volumeMounts:
+        - name: shared-storage
+          mountPath: /shared
+
+  volumes:
+    - name: shared-storage
+      hostPath:
+        path: /data/shared
+        type: DirectoryOrCreate
