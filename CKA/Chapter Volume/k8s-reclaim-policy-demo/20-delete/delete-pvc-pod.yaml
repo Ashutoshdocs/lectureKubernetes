@@ -1,0 +1,53 @@
+# =============================================================================
+# 20 - RECLAIM POLICY: Delete
+# =============================================================================
+# CLAIM TO PROVE:
+#   With persistentVolumeReclaimPolicy: Delete, deleting the PVC also deletes
+#   the PV AND asks the storage backend to delete the underlying volume. Data is
+#   gone. This is the default for dynamically-provisioned volumes.
+#
+# We DON'T hand-write a PV here. Instead we use the cluster's default
+# StorageClass, which dynamically provisions a PV. Almost every default
+# StorageClass ships with reclaimPolicy: Delete - so this is the behavior you
+# get "for free" and must be aware of.
+#
+# Check your default SC first:
+#   kubectl get storageclass
+#   kubectl get sc -o custom-columns=NAME:.metadata.name,RECLAIM:.reclaimPolicy,DEFAULT:.metadata.annotations.'storageclass\.kubernetes\.io/is-default-class'
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: delete-pvc
+  namespace: reclaim-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName omitted -> uses the cluster DEFAULT SC (usually Delete).
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: delete-writer
+  namespace: reclaim-demo
+spec:
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "throwaway data at $(date -u)" > /data/ephemeral.txt
+          cat /data/ephemeral.txt
+          sleep 3600
+      volumeMounts:
+        - name: vol
+          mountPath: /data
+  volumes:
+    - name: vol
+      persistentVolumeClaim:
+        claimName: delete-pvc

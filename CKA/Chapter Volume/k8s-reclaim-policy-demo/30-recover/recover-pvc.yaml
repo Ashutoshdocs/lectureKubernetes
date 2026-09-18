@@ -1,0 +1,52 @@
+# =============================================================================
+# 30 - RECOVER a Retained volume (the practical payoff of Retain)
+# =============================================================================
+# After you deleted retain-pvc, the PV "retain-pv" is stuck in phase Released
+# and CANNOT be re-bound automatically, because it still records the old claim
+# in spec.claimRef. To reuse it (and its data), an admin clears claimRef:
+#
+#   kubectl patch pv retain-pv -p '{"spec":{"claimRef": null}}'
+#
+# That flips the PV to Available. Then this NEW claim binds to it and a pod can
+# read the SAME /data/precious.txt written before. That is the recovery story.
+# Apply AFTER running the patch above (see README step 10-retain, part 6).
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: retain-pvc-v2
+  namespace: reclaim-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual-retain
+  resources:
+    requests:
+      storage: 100Mi
+  selector:
+    matchLabels:
+      demo: retain            # matches the still-existing retain-pv
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: retain-reader
+  namespace: reclaim-demo
+spec:
+  containers:
+    - name: reader
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "reading data that survived PVC deletion:"
+          cat /data/precious.txt || echo "NOT FOUND - data was lost!"
+          sleep 3600
+      volumeMounts:
+        - name: vol
+          mountPath: /data
+  volumes:
+    - name: vol
+      persistentVolumeClaim:
+        claimName: retain-pvc-v2
