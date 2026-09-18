@@ -1,0 +1,71 @@
+# =============================================================================
+# 00 - NFS Server (provides a REAL shared filesystem so RWX can actually work)
+# =============================================================================
+# Why this exists:
+#   RWX (ReadWriteMany) means "many nodes can mount this volume read-write at
+#   the same time". A plain hostPath or a typical block volume (EBS/GCE PD/
+#   Azure Disk) CANNOT do this - they physically attach to one node only.
+#   To PROVE RWX you need a storage backend that supports concurrent multi-node
+#   write access. NFS is the simplest one. This pod is our tiny in-cluster NFS
+#   server; every RWX/ROX demo below mounts an export from it.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: pv-demo
+  labels:
+    app: nfs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine:12
+          securityContext:
+            privileged: true          # NFS kernel server needs this
+          env:
+            - name: SHARED_DIRECTORY
+              value: /exports
+          ports:
+            - name: nfs
+              containerPort: 2049
+            - name: mountd
+              containerPort: 20048
+            - name: rpcbind
+              containerPort: 111
+          volumeMounts:
+            - name: export-vol
+              mountPath: /exports
+      volumes:
+        - name: export-vol
+          emptyDir: {}                # demo only - data is ephemeral
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: pv-demo
+  labels:
+    app: nfs-server
+spec:
+  # A stable ClusterIP so the PV can point at the NFS server by DNS/IP.
+  selector:
+    app: nfs-server
+  ports:
+    - name: nfs
+      port: 2049
+      targetPort: 2049
+    - name: mountd
+      port: 20048
+      targetPort: 20048
+    - name: rpcbind
+      port: 111
+      targetPort: 111

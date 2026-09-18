@@ -1,0 +1,49 @@
+# =============================================================================
+# 10 - RWX  (ReadWriteMany)
+# =============================================================================
+# CLAIM TO PROVE:
+#   A single PVC with accessMode ReadWriteMany can be mounted READ-WRITE by
+#   MANY pods spread across MANY nodes SIMULTANEOUSLY, and they all see each
+#   other's writes on the same filesystem.
+#
+# HOW WE PROVE IT:
+#   - One NFS-backed PV declared ReadWriteMany.
+#   - A Deployment with 3 replicas, each pod writing a line into the SAME file
+#     on the shared volume every few seconds.
+#   - Read the file from any pod: you see interleaved writes from all 3 pods.
+#     => concurrent multi-writer access is real.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rwx-nfs-pv
+  labels:
+    demo: rwx
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany            # <-- THE STAR OF THIS DEMO
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""         # static binding, no dynamic provisioner
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: nfs-server.pv-demo.svc.cluster.local
+    path: /
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rwx-nfs-pvc
+  namespace: pv-demo
+spec:
+  accessModes:
+    - ReadWriteMany            # PVC must REQUEST the same mode to bind
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi
+  selector:
+    matchLabels:
+      demo: rwx

@@ -1,0 +1,63 @@
+# =============================================================================
+# 40 - BONUS: RWOP (ReadWriteOncePod) - the strict single-POD mode
+# =============================================================================
+# Kubernetes 1.22+ (stable in 1.29) added a 4th access mode: ReadWriteOncePod.
+# THIS one really does mean "exactly ONE pod in the whole cluster". Even two
+# pods on the SAME node cannot share it - the second stays Pending.
+#
+# CLAIM TO PROVE:
+#   With RWOP, a 2-replica Deployment can only ever get ONE running pod; the
+#   other is blocked because the volume is already used by a pod.
+#
+# Requires a CSI driver that supports RWOP (most modern ones do).
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rwop-pvc
+  namespace: pv-demo
+spec:
+  accessModes:
+    - ReadWriteOncePod        # <-- exactly one pod, cluster-wide
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rwop-demo
+  namespace: pv-demo
+  labels:
+    app: rwop-demo
+spec:
+  replicas: 2                 # ask for 2, but only 1 can ever mount
+  selector:
+    matchLabels:
+      app: rwop-demo
+  template:
+    metadata:
+      labels:
+        app: rwop-demo
+    spec:
+      # Pin both to the same node to show it's a POD limit, not a node limit.
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: rwop-demo
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["/bin/sh", "-c", "echo $(hostname) has the volume; sleep 3600"]
+          volumeMounts:
+            - name: vol
+              mountPath: /data
+      volumes:
+        - name: vol
+          persistentVolumeClaim:
+            claimName: rwop-pvc

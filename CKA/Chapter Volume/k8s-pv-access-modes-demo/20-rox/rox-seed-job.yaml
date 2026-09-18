@@ -1,0 +1,76 @@
+# =============================================================================
+# 20 - ROX  (ReadOnlyMany)  -- STEP 1: seed the data
+# =============================================================================
+# ROX means "many nodes mount it, but READ-ONLY". Read-only data has to be put
+# there by SOMEONE first. This Job mounts the SAME NFS share read-WRITE once,
+# writes a dataset, then exits. After this, everyone else consumes it read-only.
+# (Real-world analogue: a build job bakes a model/config bundle, then many
+#  inference pods mount it read-only.)
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rox-nfs-pv
+  labels:
+    demo: rox
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadOnlyMany
+    - ReadWriteMany            # the PV *supports* both; consumers pick per-claim
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: nfs-server.pv-demo.svc.cluster.local
+    path: /
+---
+# A claim used ONCE to seed the data (requests RWX so it can write).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rox-seed-pvc
+  namespace: pv-demo
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi
+  selector:
+    matchLabels:
+      demo: rox
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rox-seed
+  namespace: pv-demo
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "seeding read-only dataset..."
+              echo "v1.0.0" > /data/VERSION
+              echo "this file is served READ-ONLY to many pods" > /data/README
+              date -u +"seeded at %Y-%m-%dT%H:%M:%SZ" > /data/SEALED_AT
+              ls -l /data
+              echo "seed complete."
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rox-seed-pvc

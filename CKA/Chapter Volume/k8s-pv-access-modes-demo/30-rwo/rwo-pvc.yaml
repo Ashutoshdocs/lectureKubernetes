@@ -1,0 +1,27 @@
+# =============================================================================
+# 30 - RWO  (ReadWriteOnce)
+# =============================================================================
+# CLAIM TO PROVE (and the #1 misconception):
+#   RWO does NOT mean "only one pod". It means "mounted read-write by a single
+#   NODE at a time". Multiple pods on the SAME node can share an RWO volume.
+#   But a pod on a DIFFERENT node cannot attach it -> "Multi-Attach error".
+#
+# We use a dynamically-provisioned block volume via the cluster's default
+# StorageClass (EBS / GCE PD / Azure Disk / local-path / hostpath). Block
+# volumes attach to exactly ONE node, which is what makes RWO enforceable.
+# If your default SC name differs, this still works because we omit it and let
+# the cluster's default StorageClass provision.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rwo-pvc
+  namespace: pv-demo
+spec:
+  accessModes:
+    - ReadWriteOnce           # <-- single-NODE read-write
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName omitted on purpose -> uses the cluster default SC,
+  # which provisions a real block volume (the kind RWO is meant for).

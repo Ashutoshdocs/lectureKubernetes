@@ -1,0 +1,63 @@
+# =============================================================================
+# 30 - RWO  -- EXPERIMENT B: a pod on a DIFFERENT node tries the same PVC.
+# =============================================================================
+# EXPECTED RESULT: this pod gets STUCK in ContainerCreating, and
+#   `kubectl describe pod` shows:
+#     Warning  FailedAttachVolume ... Multi-Attach error for volume "pvc-..."
+#     Volume is already exclusively attached to one node and can't be attached
+#     to another
+# THAT EVENT IS THE PROOF that RWO is enforced at the node boundary.
+#
+# REQUIREMENT: a cluster with >= 2 worker nodes. We use podAntiAffinity
+# (required) against the Experiment A pods so the scheduler MUST place this pod
+# on a different node than the one holding the volume.
+#
+# On a single-node cluster this experiment cannot trigger (there is no "other
+# node"); that is itself the lesson - RWO only constrains across nodes.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rwo-other-node
+  namespace: pv-demo
+  labels:
+    app: rwo-other-node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rwo-other-node
+  template:
+    metadata:
+      labels:
+        app: rwo-other-node
+    spec:
+      # HARD requirement: do NOT schedule onto any node running rwo-same-node.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: rwo-same-node
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: app
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(hostname) on node=$NODE_NAME got the volume - unexpected on multi-node!" >> /data/rwo.log
+              tail -f /data/rwo.log
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: vol
+              mountPath: /data
+      volumes:
+        - name: vol
+          persistentVolumeClaim:
+            claimName: rwo-pvc      # SAME claim already attached on node A

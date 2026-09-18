@@ -1,0 +1,71 @@
+# =============================================================================
+# 20 - ROX  (ReadOnlyMany)  -- STEP 2: many read-only consumers
+# =============================================================================
+# CLAIM TO PROVE:
+#   Many pods can mount the same volume at once, and when mounted read-only
+#   the filesystem physically REJECTS writes (Read-only file system).
+#
+# HOW WE PROVE IT:
+#   - A ReadOnlyMany PVC (rox-readonly-pvc).
+#   - 3 reader replicas mount it with `readOnly: true`.
+#   - Each pod: reads VERSION successfully, then TRIES to write and FAILS with
+#     "Read-only file system". The failing write is the proof.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rox-readonly-pvc
+  namespace: pv-demo
+spec:
+  accessModes:
+    - ReadOnlyMany            # <-- request read-only-many
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi
+  selector:
+    matchLabels:
+      demo: rox
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rox-readers
+  namespace: pv-demo
+  labels:
+    app: rox-readers
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rox-readers
+  template:
+    metadata:
+      labels:
+        app: rox-readers
+    spec:
+      containers:
+        - name: reader
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "[$(hostname)] READ test:"
+              cat /data/VERSION || echo "  (could not read VERSION)"
+              echo "[$(hostname)] WRITE test (expected to FAIL):"
+              if echo "tampering" > /data/HACKED 2>/tmp/err; then
+                echo "  UNEXPECTED: write succeeded -> volume is NOT read-only!"
+              else
+                echo "  EXPECTED: write blocked -> $(cat /tmp/err)"
+              fi
+              echo "[$(hostname)] done. sleeping."
+              sleep 3600
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true        # <-- kubelet mounts the fs read-only
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rox-readonly-pvc
