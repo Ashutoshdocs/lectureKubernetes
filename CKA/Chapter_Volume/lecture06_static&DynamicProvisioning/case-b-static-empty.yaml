@@ -1,0 +1,54 @@
+# ============================================================
+# CASE B — storageClassName "" (empty)  ->  STATIC binding
+# ============================================================
+# Empty string means: NO storage class, NO dynamic provisioning.
+# The PVC can only bind to an existing PV that ALSO has "".
+# So we must supply the PV ourselves (static provisioning).
+#
+# Apply:   kubectl apply -f case-b-static-empty.yaml
+# Watch:   kubectl get pv,pvc
+# Expect:  case-b-pvc binds to OUR case-b-pv. No pvc-<uuid> is created.
+# ============================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: case-b-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""            # classless PV (matches a "" PVC)
+  hostPath:
+    path: /data/case-b-pv
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: case-b-pvc
+spec:
+  storageClassName: ""            # opt OUT of dynamic provisioning
+  volumeName: case-b-pv          # optional: bind to this exact PV by name
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi               # must fit within the PV's capacity
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: case-b-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      volumeMounts:
+        - name: data
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: case-b-pvc

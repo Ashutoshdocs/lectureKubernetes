@@ -1,0 +1,101 @@
+# ============================================================
+# CASE C — storageClassName "some-name"  ->  named class
+# ------------------------------------------------------------
+# A named class can do EITHER of two things, so we show BOTH:
+#
+#   C1) name points at a real provisioner  -> DYNAMIC
+#       (here we reuse the cluster's existing "local-path" class)
+#
+#   C2) name points at a no-provisioner class + a PV of that class
+#       -> STATIC bind by class name (no auto-creation)
+# ============================================================
+
+
+# ---------- C1: named class -> DYNAMIC provisioning ----------
+# "local-path" already exists on this cluster and has a provisioner.
+# Naming it explicitly provisions a new PV via that class.
+#
+# Apply:   kubectl apply -f case-c-named-class.yaml
+# Expect:  case-c1-pvc gets a fresh pvc-<uuid> PV, StorageClass=local-path
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: case-c1-pvc
+spec:
+  storageClassName: local-path    # a real class with a provisioner -> dynamic
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: case-c1-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      volumeMounts:
+        - name: data
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: case-c1-pvc
+
+---
+# ---------- C2: named class -> STATIC bind by class name ----------
+# A class with "no-provisioner" cannot create volumes; it is just a
+# LABEL used to group hand-made PVs. The PVC binds to a PV that
+# carries the same class name. Nothing is auto-provisioned.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: manual
+provisioner: kubernetes.io/no-provisioner   # <- cannot build volumes
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: case-c2-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual         # this PV belongs to class "manual"
+  hostPath:
+    path: /data/case-c2-pv
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: case-c2-pvc
+spec:
+  storageClassName: manual         # same class name -> binds case-c2-pv
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: case-c2-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      volumeMounts:
+        - name: data
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: case-c2-pvc

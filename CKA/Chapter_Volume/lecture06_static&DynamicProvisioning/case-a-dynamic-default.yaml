@@ -1,0 +1,38 @@
+# ============================================================
+# CASE A — storageClassName OMITTED  ->  DYNAMIC (default class)
+# ============================================================
+# We create NO PersistentVolume here on purpose.
+# The PVC does not mention storageClassName at all, so Kubernetes
+# uses the DEFAULT StorageClass and provisions a brand-new PV for us.
+#
+# Apply:   kubectl apply -f case-a-dynamic-default.yaml
+# Watch:   kubectl get pv,pvc
+# Expect:  a PV named pvc-<uuid> appears automatically, Bound to case-a-pvc
+# ============================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: case-a-pvc
+spec:
+  # (no storageClassName line) -> "use the default StorageClass"
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: case-a-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      volumeMounts:
+        - name: data
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: case-a-pvc
