@@ -1,0 +1,42 @@
+# =============================================================================
+# hostPath demo pod (second reader) - proves SHARING between pods
+# =============================================================================
+# A SECOND, independent pod mounting the SAME node path. It has no relationship
+# to hostpath-pod, yet it sees the exact same files -> hostPath is shared by any
+# pod on the node. (emptyDir can never do this.)
+#
+# Pinned to the same node as hostpath-pod via podAffinity so both see the same
+# host directory. Harmless on a single-node cluster.
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-pod2
+  namespace: vol-demo
+  labels:
+    demo: hostpath
+spec:
+  affinity:
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                demo: hostpath
+            topologyKey: kubernetes.io/hostname
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo hostpath-pod2 up on $NODE_NAME; sleep 3600"]
+      env:
+        - name: NODE_NAME
+          valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+      volumeMounts:
+        - name: nodedir
+          mountPath: /data
+  volumes:
+    - name: nodedir
+      hostPath:
+        path: /mnt/data/hostpath-demo    # SAME node path as hostpath-pod
+        type: DirectoryOrCreate
