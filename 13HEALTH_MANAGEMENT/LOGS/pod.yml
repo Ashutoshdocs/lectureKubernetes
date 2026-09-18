@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend-pod
+  namespace: logs-demo
+  labels:
+    app: frontend
+spec:
+  containers:
+
+  # ── Container 1: NGINX frontend on port 80 ──────────────────
+  - name: web-nginx
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
+    lifecycle:
+      postStart:
+        exec:
+          command:
+          - sh
+          - -c
+          - echo "<h1>Frontend - NGINX (container 1) :80</h1>" > /usr/share/nginx/html/index.html
+    # nginx access/error logs are symlinked to stdout/stderr in the
+    # official image, so every request shows up in `kubectl logs`.
+
+  # ── Container 2: Python HTTP server on port 8080 ────────────
+  - name: web-python
+    image: python:3.12-alpine
+    ports:
+    - containerPort: 8080
+    command:
+    - sh
+    - -c
+    - |
+      mkdir -p /www
+      echo "<h1>Frontend - Python (container 2) :8080</h1>" > /www/index.html
+      cd /www
+      # http.server logs every request to stderr -> captured by kubectl logs
+      exec python -m http.server 8080
