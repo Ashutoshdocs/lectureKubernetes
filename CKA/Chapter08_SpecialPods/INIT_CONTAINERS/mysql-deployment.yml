@@ -21,7 +21,7 @@ spec:
             - containerPort: 3306
           env:
             - name: MYSQL_ROOT_PASSWORD
-              value: "pass"
+              value: "pass"          # demo only — use a Secret in production
 ---
 apiVersion: v1
 kind: Service
@@ -37,4 +37,3 @@ spec:
       port: 3306
       targetPort: 3306
   type: ClusterIP
-

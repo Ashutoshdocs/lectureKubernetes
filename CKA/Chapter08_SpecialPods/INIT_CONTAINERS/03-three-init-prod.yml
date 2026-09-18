@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-python-init-demo
+  labels:
+    app: web-demo
+spec:
+  restartPolicy: Always
+
+  # -----------------------------------------------------------------
+  # INIT CONTAINERS — run in ORDER, each to completion, before the app.
+  #   1) render config   2) check DB   3) verify dependencies
+  # If any one fails, Kubernetes retries it and the app never starts.
+  # -----------------------------------------------------------------
+  initContainers:
+
+  # 1) Produce the app config onto the shared volume.
+  - name: init-download-config
+    image: busybox:1.36
+    imagePullPolicy: IfNotPresent
+    command:
+    - sh
+    - -c
+    - |
+      echo "[init-1] Writing configuration file..."
+      mkdir -p /app/config
+      echo "APP_ENV=production" > /app/config/app.env
+      echo "[init-1] Config file ready."
+    volumeMounts:
+    - name: app-storage
+      mountPath: /app
+    resources:
+      requests: { cpu: "10m", memory: "16Mi" }
+      limits:   { cpu: "50m", memory: "32Mi" }
+
+  # 2) Simulate a dependency/DB readiness check.
+  - name: init-db-setup
+    image: busybox:1.36
+    imagePullPolicy: IfNotPresent
+    command:
+    - sh
+    - -c
+    - |
+      echo "[init-2] Checking DB connection..."
+      sleep 2
+      echo "DB connection successful!" > /app/config/db_status.txt
+      echo "[init-2] DB check done."
+    volumeMounts:
+    - name: app-storage
+      mountPath: /app
+    resources:
+      requests: { cpu: "10m", memory: "16Mi" }
+      limits:   { cpu: "50m", memory: "32Mi" }
+
+  # 3) Verify runtime dependencies are installable.
+  - name: init-verify-dependencies
+    image: python:3.10-slim
+    imagePullPolicy: IfNotPresent
+    command:
+    - sh
+    - -c
+    - |
+      echo "[init-3] Verifying dependencies..."
+      pip install --no-cache-dir flask > /dev/null
+      echo "Dependencies verified!" > /app/config/deps.txt
+      echo "[init-3] Dependencies OK."
+    volumeMounts:
+    - name: app-storage
+      mountPath: /app
+    resources:
+      requests: { cpu: "50m", memory: "64Mi" }
+      limits:   { cpu: "250m", memory: "256Mi" }
+
+  # -----------------------------------------------------------------
+  # MAIN CONTAINERS — start only after all three init containers pass.
+  # -----------------------------------------------------------------
+  containers:
+
+  - name: nginx
+    image: nginx:1.27-alpine
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - name: app-storage
+      mountPath: /usr/share/nginx/html
+    command:
+    - sh
+    - -c
+    - |
+      echo "<h1>Welcome to Nginx Frontend</h1>"   >  /usr/share/nginx/html/index.html
+      echo "<p>Served by the Nginx container.</p>" >> /usr/share/nginx/html/index.html
+      nginx -g 'daemon off;'
+    resources:
+      requests: { cpu: "25m", memory: "32Mi" }
+      limits:   { cpu: "100m", memory: "128Mi" }
+    readinessProbe:
+      httpGet: { path: /, port: 80 }
+      initialDelaySeconds: 3
+      periodSeconds: 5
+    livenessProbe:
+      httpGet: { path: /, port: 80 }
+      initialDelaySeconds: 10
+      periodSeconds: 10
+
+  - name: python-app
+    image: python:3.10-slim
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 5000
+    volumeMounts:
+    - name: app-storage
+      mountPath: /app
+    command:
+    - sh
+    - -c
+    - |
+      pip install --no-cache-dir flask > /dev/null
+      cat <<EOF > /app/app.py
+      from flask import Flask
+      app = Flask(__name__)
+      @app.route('/')
+      def home():
+          return "Hello from Flask App! Configs: " + open('/app/config/app.env').read()
+      if __name__ == '__main__':
+          app.run(host='0.0.0.0', port=5000)
+      EOF
+      python /app/app.py
+    resources:
+      requests: { cpu: "50m", memory: "64Mi" }
+      limits:   { cpu: "250m", memory: "256Mi" }
+    readinessProbe:
+      httpGet: { path: /, port: 5000 }
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+  # -----------------------------------------------------------------
+  # SHARED VOLUME — written by init containers, read by the app.
+  # -----------------------------------------------------------------
+  volumes:
+  - name: app-storage
+    emptyDir: {}
