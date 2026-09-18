@@ -1,0 +1,48 @@
+# =============================================================================
+# The shared volume: an RWX PVC that MANY pods (writers + readers) mount at once.
+# This is the production-correct replacement for the hostPath in the original
+# writer/reader demo. RWX = ReadWriteMany, so it works across nodes and survives
+# rescheduling - the two things hostPath cannot do.
+#
+# Here we statically bind to the in-cluster NFS server. To go fully managed,
+# delete this PV and give the PVC a `storageClassName` instead
+# (see storageclass-swap.md) - the workloads don't change at all.
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: shared-nfs-pv
+  labels:
+    app.kubernetes.io/name: shared-storage
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain      # don't auto-delete real data
+  storageClassName: ""                        # static bind, no provisioner
+  mountOptions:
+    - nfsvers=4.1
+    - hard
+    - noatime
+  nfs:
+    server: nfs-server.shared-storage.svc.cluster.local
+    path: /
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-pvc
+  namespace: shared-storage
+  labels:
+    app.kubernetes.io/name: shared-storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 2Gi
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shared-storage
