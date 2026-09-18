@@ -1,0 +1,72 @@
+# =============================================================================
+# 10 - hostPath: TWO pods sharing ONE PVC (pod-a + pod-b)
+# =============================================================================
+# These are 2 of the 3 pods in the demo. Both mount hostpath-pvc, so anything
+# written by one is instantly seen by the other and by the node folder.
+#
+# podAffinity keeps them on the same node (required for hostPath). Harmless on
+# a single-node cluster.
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-a
+  namespace: pv-types
+  labels:
+    app: hostpath-share
+spec:
+  affinity:
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: hostpath-share
+            topologyKey: kubernetes.io/hostname
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo pod-a up on $NODE_NAME; sleep 3600"]
+      env:
+        - name: NODE_NAME
+          valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+      volumeMounts:
+        - name: shared
+          mountPath: /data
+  volumes:
+    - name: shared
+      persistentVolumeClaim:
+        claimName: hostpath-pvc
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-b
+  namespace: pv-types
+  labels:
+    app: hostpath-share
+spec:
+  affinity:
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: hostpath-share
+            topologyKey: kubernetes.io/hostname
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo pod-b up on $NODE_NAME; sleep 3600"]
+      env:
+        - name: NODE_NAME
+          valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+      volumeMounts:
+        - name: shared
+          mountPath: /data
+  volumes:
+    - name: shared
+      persistentVolumeClaim:
+        claimName: hostpath-pvc     # SAME claim as pod-a

@@ -1,0 +1,65 @@
+# =============================================================================
+# 30 - (ALTERNATIVE) Azure Disk CSI driver (disk.csi.azure.com) -- STATIC, RWO
+# =============================================================================
+# Use this instead of / alongside azurefile-csi.yaml when you want to show a
+# STATIC binding to a pre-existing Azure Managed Disk. Azure Disk is BLOCK
+# storage => ReadWriteOnce (single node), so it CANNOT be shared across nodes.
+#
+# BEFORE APPLYING, create/identify a managed disk and paste its resource ID into
+# volumeHandle below:
+#   az disk create -g <rg> -n pvdemo-disk --size-gb 5 --sku Standard_LRS
+#   az disk show   -g <rg> -n pvdemo-disk --query id -o tsv
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: azuredisk-pv
+  labels:
+    type: azuredisk
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""            # static bind, no dynamic provisioning
+  csi:
+    driver: disk.csi.azure.com
+    # vvv REPLACE with the output of `az disk show ... --query id -o tsv` vvv
+    volumeHandle: /subscriptions/<SUB_ID>/resourceGroups/<RG>/providers/Microsoft.Compute/disks/pvdemo-disk
+    volumeAttributes:
+      fsType: ext4
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: azuredisk-pvc
+  namespace: pv-types
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      type: azuredisk
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-azuredisk
+  namespace: pv-types
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["/bin/sh", "-c", "echo written inside pod at $(date -u) >> /data/from-pod.txt; sleep 3600"]
+      volumeMounts:
+        - name: diskvol
+          mountPath: /data
+  volumes:
+    - name: diskvol
+      persistentVolumeClaim:
+        claimName: azuredisk-pvc

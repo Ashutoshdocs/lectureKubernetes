@@ -1,0 +1,45 @@
+# =============================================================================
+# 10 - hostPath PV/PVC   (PVC #1 of 2)
+# =============================================================================
+# hostPath mounts a directory FROM THE NODE'S filesystem into the pod. It is the
+# best backend to prove "inside == outside", because the "outside" is just a
+# folder on the node you can open with a shell.
+#
+# In THIS demo, PVC #1 (hostpath-pvc) is shared by TWO pods (pod-a + pod-b),
+# giving us: write in pod-a -> visible in pod-b AND on the node directory.
+#
+# hostPath is node-local: both pods MUST land on the same node. On a single-node
+# cluster that's automatic; on multi-node we pin them (see hostpath-pods.yaml).
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hostpath-pv
+  labels:
+    type: hostpath
+spec:
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteOnce          # one node, but many pods on that node can share
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual-hostpath
+  hostPath:
+    path: /mnt/data/hostpath-demo    # this folder lives ON THE NODE
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hostpath-pvc
+  namespace: pv-types
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual-hostpath
+  resources:
+    requests:
+      storage: 500Mi
+  selector:
+    matchLabels:
+      type: hostpath

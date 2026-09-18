@@ -1,0 +1,74 @@
+# =============================================================================
+# 30 - Azure File CSI driver (file.csi.azure.com)  -- DYNAMIC, RWX
+# =============================================================================
+# REQUIRES: an AKS cluster (or any cluster with the Azure File CSI driver
+# installed). Managed AKS already has it. On kind/minikube this will NOT bind -
+# that's expected; use the hostPath + NFS parts there instead.
+#
+# Azure Files = an SMB/NFS share in an Azure Storage Account. Because it's a
+# real network share it supports ReadWriteMany, and "outside the pod" = the
+# Azure Files share visible in the Portal / Storage Explorer / `az storage file`.
+#
+# This is fully DYNAMIC: the StorageClass provisions the storage account + share
+# for you when the PVC is created. No hand-written PV.
+# =============================================================================
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azurefile-csi-demo
+provisioner: file.csi.azure.com
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  skuName: Standard_LRS          # Standard locally-redundant storage
+mountOptions:
+  - dir_mode=0777
+  - file_mode=0777
+  - uid=0
+  - gid=0
+  - mfsymlinks
+  - cache=strict
+  - actimeo=30
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: azurefile-pvc
+  namespace: pv-types
+spec:
+  accessModes:
+    - ReadWriteMany              # Azure Files supports RWX
+  storageClassName: azurefile-csi-demo
+  resources:
+    requests:
+      storage: 5Gi              # Azure Files minimum billed size varies by tier
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-azure
+  namespace: pv-types
+  labels:
+    app: azure-consumer
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "pod-azure on $NODE_NAME writing to Azure Files..."
+          echo "written inside pod at $(date -u)" >> /data/from-pod.txt
+          sleep 3600
+      env:
+        - name: NODE_NAME
+          valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+      volumeMounts:
+        - name: azurevol
+          mountPath: /data
+  volumes:
+    - name: azurevol
+      persistentVolumeClaim:
+        claimName: azurefile-pvc
