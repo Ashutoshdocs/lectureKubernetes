@@ -1,3 +1,0 @@
-kubectl logs -f downwardapi-demo
-
-kubectl annotate pod downwardapi-demo owner=neo --overwrite
