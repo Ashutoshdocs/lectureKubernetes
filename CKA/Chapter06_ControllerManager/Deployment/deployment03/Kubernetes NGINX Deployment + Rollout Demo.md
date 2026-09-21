@@ -166,7 +166,9 @@ metadata:
   name: nginx-demo
 
   annotations:
-    kubernetes.io/change-cause: "Initial deployment"
+    description: "Nginx demo deployment"
+    app.kubernetes.io/version: "v1"
+    app.kubernetes.io/managed-by: "kubectl"
 
 spec:
   replicas: 3
@@ -221,13 +223,10 @@ spec:
               value: "v1"
 
           command:
-
             - /bin/sh
-
             - -c
 
           args:
-
             - |
               cp /config/index.html /usr/share/nginx/html/index.html
               sed -i "s/POD_NAME/${POD_NAME}/g" /usr/share/nginx/html/index.html
@@ -247,7 +246,6 @@ spec:
         - name: html
 
           configMap:
-
             name: nginx-html
 ```
 
