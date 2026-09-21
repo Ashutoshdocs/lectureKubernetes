@@ -11,7 +11,6 @@ spec:
     metadata:
       labels:
         app: nginx-rs
-        version: rsv1
     spec:
       containers:
         - name: nginx
