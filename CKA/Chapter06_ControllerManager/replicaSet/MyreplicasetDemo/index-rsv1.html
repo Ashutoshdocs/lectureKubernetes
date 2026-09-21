@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReplicaSet Demo - RSv1</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: Inter, Arial, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e3a8a);
+      color: white;
+    }
+    .card {
+      width: min(760px, 92%); padding: 48px; border-radius: 28px;
+      background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.2);
+      box-shadow: 0 25px 70px rgba(0,0,0,.35); backdrop-filter: blur(12px);
+      text-align: center;
+    }
+    .badge { display:inline-block; padding:8px 16px; border-radius:999px;
+      background:#22c55e; color:#052e16; font-weight:800; letter-spacing:.08em; }
+    h1 { font-size: clamp(42px, 8vw, 76px); margin:22px 0 8px; }
+    p { font-size: 20px; opacity:.9; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:32px; }
+    .box { padding:18px; border-radius:16px; background:rgba(0,0,0,.2); }
+    .value { font-size:24px; font-weight:800; margin-top:6px; }
+    footer { margin-top:30px; opacity:.7; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <span class="badge">REPLICASET DEMO</span>
+    <h1>RSv1</h1>
+    <p>ReplicaSet Version 1 — Kubernetes Pod Template</p>
+    <section class="grid">
+      <div class="box">Version<div class="value">RSv1</div></div>
+      <div class="box">Container<div class="value">Nginx</div></div>
+      <div class="box">Purpose<div class="value">Original</div></div>
+    </section>
+    <footer>Change the image to RSv2 and recreate the Pods to observe the update.</footer>
+  </main>
+</body>
+</html>

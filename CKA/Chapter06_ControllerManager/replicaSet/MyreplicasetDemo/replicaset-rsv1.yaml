@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-rs
+  template:
+    metadata:
+      labels:
+        app: nginx-rs
+        version: rsv1
+    spec:
+      containers:
+        - name: nginx
+          image: DOCKERHUB_USERNAME/myreplicasetdemo:rsv1
+          ports:
+            - containerPort: 80
