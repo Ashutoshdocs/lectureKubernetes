@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: nginx-direct
+  namespace: default
+
+spec:
+  nodeName: node01
+
+  containers:
+    - name: nginx
+      image: nginx:latest
+      ports:
+        - containerPort: 80
