@@ -1,0 +1,41 @@
+# The namespace our demo "application" pods live in. Custom rules are scoped
+# to this namespace so demo detections are easy to tell apart from noise.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-apps
+  labels:
+    app.kubernetes.io/part-of: falco-demo
+---
+# A plain, long-running pod we exec into to trigger detections. It's just
+# nginx sitting idle — nothing malicious. The "attacks" are the commands we
+# run inside it in the demo scripts.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victim
+  namespace: demo-apps
+  labels:
+    app: victim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: victim
+  template:
+    metadata:
+      labels:
+        app: victim
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

@@ -1,0 +1,35 @@
+# Scenario 5 — Crypto-miner simulation (custom rule).
+#
+# WHAT IT DOES: starts a pod whose process is renamed to "xmrig" (a well-known
+#   miner binary name). It runs `sleep` under that name — it does NOT mine
+#   anything. It exists purely to match our custom rule by process name.
+# THE RULE:     custom "Suspicious miner-like process in demo namespace"
+#               (rules/custom-rules.yaml), priority CRITICAL, MITRE T1496.
+# WHY IT MATTERS: cryptojacking is one of the most common outcomes of a
+#   compromised container. Falco catches it on process name / Stratum traffic
+#   without needing to know the specific malware in advance.
+#
+# Apply:   kubectl apply -f demo/05-crypto-miner-sim.yaml
+# Remove:  kubectl delete -f demo/05-crypto-miner-sim.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: miner-sim
+  namespace: demo-apps
+  labels:
+    app: miner-sim
+spec:
+  restartPolicy: Never
+  containers:
+    - name: miner-sim
+      image: busybox:1.36
+      # `exec -a xmrig` runs sleep but presents argv[0] as "xmrig", so
+      # proc.name = xmrig and our rule fires. Nothing is actually mined.
+      command: ["sh", "-c", "exec -a xmrig sleep 120"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 50m
+          memory: 32Mi

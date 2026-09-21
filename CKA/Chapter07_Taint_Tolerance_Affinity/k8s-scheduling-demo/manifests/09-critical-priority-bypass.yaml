@@ -1,0 +1,38 @@
+# ==============================================================================
+# 09 - PriorityClass + preemption: bypassing a "full" node, not a taint
+# ------------------------------------------------------------------------------
+# Different kind of bypass. cordon/taint control PERMISSION to be on a node.
+# Priority controls what happens when a node is FULL: a high-priority pending pod
+# can PREEMPT (evict) lower-priority pods to make room.
+#
+# Note: preemption does NOT bypass taints or cordon. A preemptor still needs a
+# toleration for tainted nodes and still won't land on a cordoned node. Priority
+# only wins the fight for *resources* among schedulable nodes.
+#
+# system-node-critical / system-cluster-critical are the built-in top priorities
+# that keep control-plane and node agents alive; that is why they rarely get evicted.
+# ==============================================================================
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority-demo
+value: 1000000
+globalDefault: false
+description: "Demo high priority; will preempt lower-priority pods when the node is full."
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: important-pod
+  labels:
+    demo: priority
+spec:
+  priorityClassName: high-priority-demo
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "128Mi"

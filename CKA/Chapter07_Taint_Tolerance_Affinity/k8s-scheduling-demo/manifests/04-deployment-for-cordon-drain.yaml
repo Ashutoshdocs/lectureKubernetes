@@ -1,0 +1,36 @@
+# ==============================================================================
+# 04 - A normal Deployment used to demo CORDON and DRAIN
+# ------------------------------------------------------------------------------
+# These are managed pods (owned by a ReplicaSet). This matters a LOT:
+#   - drain will happily evict them, because the ReplicaSet recreates them elsewhere
+#   - a bare (naked) pod is different -> see 06-bare-pod-blocks-drain.yaml
+#
+# Run it, then spread the pods so cordon/drain has something to show:
+#   kubectl apply -f 04-deployment-for-cordon-drain.yaml
+#   kubectl get pods -o wide -l app=web
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      # Small graceful shutdown window so you can watch eviction happen.
+      terminationGracePeriodSeconds: 20
+      containers:
+        - name: web
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"

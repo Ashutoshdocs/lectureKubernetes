@@ -1,0 +1,52 @@
+# ==============================================================================
+# 03 - TOLERATION operators and the "tolerate everything" wildcards
+# ------------------------------------------------------------------------------
+# operator: Equal  -> key AND value must match the taint (value is required)
+# operator: Exists -> only the key must match; value is ignored/omitted
+#
+# Special wildcard forms (these are how system pods survive almost any taint):
+#   - Exists with a key but no effect  -> tolerates ALL effects of that key
+#   - Exists with no key and no effect -> tolerates EVERY taint (universal pass)
+# ==============================================================================
+---
+# Matches a specific key/value/effect only.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tol-equal
+spec:
+  tolerations:
+    - key: "gpu"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+---
+# Matches key "gpu" with ANY value and ANY effect (NoSchedule/PreferNoSchedule/NoExecute).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tol-exists-key
+spec:
+  tolerations:
+    - key: "gpu"
+      operator: "Exists"
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+---
+# THE UNIVERSAL PASS: tolerates every taint in the cluster.
+# This is what many DaemonSets and critical add-ons use so they run everywhere.
+# It is also the #1 reason a "drain" or "taint" does not remove a pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tol-everything
+spec:
+  tolerations:
+    - operator: "Exists"     # no key, no effect => matches all taints
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9

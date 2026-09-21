@@ -1,0 +1,114 @@
+# Helm values for the Falco demo — production-leaning defaults.
+# Chart: falcosecurity/falco
+# Install: helm install falco falcosecurity/falco -n falco --create-namespace -f install/values.yaml
+
+# ---------------------------------------------------------------------------
+# Driver: modern eBPF (CO-RE). No kernel headers or kmod needed. Kernel >= 5.8.
+# Fall back to "ebpf" if your nodes are older; avoid "kmod" on managed pools.
+# ---------------------------------------------------------------------------
+driver:
+  kind: modern_ebpf
+
+# ---------------------------------------------------------------------------
+# Falco core configuration
+# ---------------------------------------------------------------------------
+falco:
+  # JSON output is machine-parseable — required for good downstream tooling.
+  json_output: true
+  json_include_output_property: true
+  log_level: info
+
+  # Rule files, in load order. The default set first, then our custom rules.
+  rules_files:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/falco_rules.local.yaml
+    - /etc/falco/rules.d          # our custom rules land here (see customRules)
+
+  # Alert if the kernel buffer overflows and Falco has to drop syscalls.
+  # A drop == a missed event == a detection gap, so we log AND alert on it.
+  syscall_event_drops:
+    actions:
+      - log
+      - alert
+    rate: 0.03333
+    max_burst: 10
+
+  # Expose Prometheus metrics so you can alert on Falco itself (drops, evts).
+  metrics:
+    enabled: true
+    interval: 15m
+    output_rule: true
+    resource_utilization_enabled: true
+
+# ---------------------------------------------------------------------------
+# Custom rules — mounted into /etc/falco/rules.d
+# This inline copy keeps the chart self-contained, so a plain
+# `helm install -f install/values.yaml` works with no extra steps.
+# The authoritative, commented copy lives in rules/custom-rules.yaml; keep
+# the two in sync (the Makefile's `make rules` reloads from that file).
+# ---------------------------------------------------------------------------
+customRules:
+  custom-rules.yaml: |-
+    - macro: demo_namespace
+      condition: (k8s.ns.name = "demo-apps")
+
+    - rule: Suspicious miner-like process in demo namespace
+      desc: A process whose name matches common crypto-miner binaries started in a demo pod.
+      condition: >
+        spawned_process and container and demo_namespace
+        and (proc.name in (xmrig, minerd, cpuminer, ethminer)
+             or proc.cmdline contains "stratum+tcp")
+      output: >
+        Possible crypto miner started (command=%proc.cmdline pod=%k8s.pod.name
+        ns=%k8s.ns.name image=%container.image.repository)
+      priority: CRITICAL
+      tags: [process, mitre_execution, T1496]
+
+    - rule: Sensitive file read in demo namespace
+      desc: A demo pod read a sensitive credential file such as /etc/shadow.
+      condition: >
+        open_read and container and demo_namespace
+        and fd.name in (/etc/shadow, /etc/sudoers)
+      output: >
+        Sensitive file opened for reading (file=%fd.name command=%proc.cmdline
+        pod=%k8s.pod.name ns=%k8s.ns.name image=%container.image.repository)
+      priority: WARNING
+      tags: [filesystem, mitre_credential_access, T1003]
+
+# ---------------------------------------------------------------------------
+# Resources — size to your syscall volume. Watch falco_n_drops in metrics;
+# drops == missed events == a detection gap.
+# ---------------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+
+# Don't get evicted first — Falco is part of your security boundary.
+priorityClassName: system-node-critical
+
+# Tolerate common taints so Falco covers every node (control-plane included).
+tolerations:
+  - operator: Exists
+
+# ---------------------------------------------------------------------------
+# Falcosidekick — fan-out layer for alerts (Slack, PagerDuty, S3, Prometheus…)
+# ---------------------------------------------------------------------------
+falcosidekick:
+  enabled: true
+  fullfqdn: false
+  webui:
+    enabled: true         # dashboard at svc/falco-falcosidekick-ui:2802
+  config:
+    debug: false
+    # Set via --set on install, or fill in here:
+    slack:
+      webhookurl: ""              # https://hooks.slack.com/services/...
+      minimumpriority: "warning"  # notice|informational|warning|error|critical
+      messageformat: "Falco alert: {{ .Priority }}"
+    # Prometheus metrics for alert volume by rule/priority/namespace.
+    prometheus:
+      extralabels: "cluster:demo"

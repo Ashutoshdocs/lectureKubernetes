@@ -1,0 +1,26 @@
+# ==============================================================================
+# 08 - Pod with local storage (emptyDir): makes drain REFUSE
+# ------------------------------------------------------------------------------
+# Evicting a pod that uses emptyDir throws away that data (emptyDir is node-local).
+# drain protects you from silent data loss by refusing to start:
+#   error: cannot delete Pods with local storage (use --delete-emptydir-data to override)
+#
+# BYPASS: `kubectl drain <node> --delete-emptydir-data`
+#   Confirms you accept losing whatever is in the emptyDir volume.
+# ==============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-emptydir
+  labels:
+    demo: drain-blockers
+spec:
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+      volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+  volumes:
+    - name: scratch
+      emptyDir: {}

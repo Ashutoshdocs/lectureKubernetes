@@ -1,0 +1,52 @@
+# ==============================================================================
+# 01 - TAINT: NoSchedule
+# ------------------------------------------------------------------------------
+# A taint is a property PUT ON A NODE that repels pods.
+# A toleration is a property PUT ON A POD that lets it ignore a matching taint.
+#
+# Mental model:
+#   Taint  = the node saying "keep out, unless you have a pass"
+#   Toleration = the pod's "pass"
+#
+# Taint format:  key=value:effect
+#   effect = NoSchedule       -> new pods without a toleration are NOT scheduled here
+#            PreferNoSchedule -> soft version; scheduler avoids but may still place
+#            NoExecute        -> as NoSchedule + EVICTS running pods that don't tolerate
+#
+# Apply the taint with kubectl (taints live on the Node object, not in this file):
+#   kubectl taint nodes <node> dedicated=team-a:NoSchedule
+#
+# Remove it later (note the trailing minus):
+#   kubectl taint nodes <node> dedicated=team-a:NoSchedule-
+# ==============================================================================
+---
+# A pod WITHOUT a toleration. On a tainted node (NoSchedule) it stays Pending.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-toleration
+  labels:
+    demo: taints
+spec:
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+---
+# A pod WITH a matching toleration. It is ALLOWED onto the tainted node.
+# NOTE: a toleration only grants permission; it does NOT force the pod here.
+# Use nodeSelector / affinity if you also want to *pull* the pod onto the node.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: with-toleration
+  labels:
+    demo: taints
+spec:
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "team-a"
+      effect: "NoSchedule"
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9

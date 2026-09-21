@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------
+# Custom Falco rules — the teaching copy.
+#
+# The three building blocks:
+#   list  — a reusable set of values
+#   macro — a reusable condition fragment
+#   rule  — condition + output + priority = an alert
+#
+# Load order matters: these are evaluated AFTER the default falco_rules.yaml,
+# so you can reference the macros/lists it already defines (spawned_process,
+# container, open_read, outbound, etc.).
+#
+# Reload after editing:  make rules   (or `helm upgrade ... -f install/values.yaml`)
+# ---------------------------------------------------------------------------
+
+# --- Lists ------------------------------------------------------------------
+
+- list: allowed_egress_ips
+  items: []          # e.g. ["10.0.0.0/8", "1.2.3.4"] — your known-good destinations
+
+- list: miner_binaries
+  items: [xmrig, minerd, cpuminer, ethminer, xmr-stak]
+
+# --- Macros -----------------------------------------------------------------
+
+- macro: demo_namespace
+  condition: (k8s.ns.name = "demo-apps")
+
+# --- Rules ------------------------------------------------------------------
+
+# 1) Crypto miner — matches known miner binary names OR a Stratum pool URL in
+#    the command line. Tagged with MITRE T1496 (Resource Hijacking).
+- rule: Suspicious miner-like process in demo namespace
+  desc: A process whose name matches common crypto-miner binaries started in a demo pod.
+  condition: >
+    spawned_process and container and demo_namespace
+    and (proc.name in (miner_binaries)
+         or proc.cmdline contains "stratum+tcp")
+  output: >
+    Possible crypto miner started (command=%proc.cmdline pod=%k8s.pod.name
+    ns=%k8s.ns.name image=%container.image.repository)
+  priority: CRITICAL
+  tags: [process, mitre_execution, T1496]
+
+# 2) Sensitive file read — a demo pod opened /etc/shadow or /etc/sudoers.
+#    MITRE T1003 (OS Credential Dumping).
+- rule: Sensitive file read in demo namespace
+  desc: A demo pod read a sensitive credential file such as /etc/shadow.
+  condition: >
+    open_read and container and demo_namespace
+    and fd.name in (/etc/shadow, /etc/sudoers)
+  output: >
+    Sensitive file opened for reading (file=%fd.name command=%proc.cmdline
+    pod=%k8s.pod.name ns=%k8s.ns.name image=%container.image.repository)
+  priority: WARNING
+  tags: [filesystem, mitre_credential_access, T1003]
+
+# 3) Unexpected egress — an app pod connected to something outside our
+#    allow-list. Starts disabled-ish (allow_list empty => everything fires),
+#    so scope allowed_egress_ips to YOUR egress before enabling in prod.
+#    MITRE T1041 (Exfiltration Over C2 Channel).
+- rule: Unexpected outbound connection from app pods
+  desc: >
+    An application pod opened an outbound connection to a destination
+    outside our known allow-list. Possible C2 or exfiltration.
+  condition: >
+    outbound and container and demo_namespace
+    and not fd.sip in (allowed_egress_ips)
+  output: >
+    Unexpected egress (command=%proc.cmdline connection=%fd.name
+    pod=%k8s.pod.name ns=%k8s.ns.name image=%container.image.repository)
+  priority: WARNING
+  tags: [network, mitre_exfiltration, T1041]
+  # In prod, prefer structured exceptions over piling on `and not ...`:
+  # exceptions:
+  #   - name: allowed_dns
+  #     fields: [fd.sport]
+  #     values: [[53]]

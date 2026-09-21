@@ -1,0 +1,62 @@
+# ==============================================================================
+# 02 - TAINT: NoExecute  (the one that EVICTS)
+# ------------------------------------------------------------------------------
+# NoSchedule only blocks NEW pods. NoExecute also kicks out pods ALREADY running
+# on the node that do not tolerate the taint.
+#
+# Apply:
+#   kubectl taint nodes <node> maintenance=true:NoExecute
+#
+# What happens to running pods on that node:
+#   - no matching toleration            -> evicted immediately
+#   - toleration WITHOUT tolerationSeconds -> stays forever
+#   - toleration WITH tolerationSeconds: N -> stays N seconds, then evicted
+#
+# tolerationSeconds is how you say "give me a grace period, then remove me".
+# ==============================================================================
+---
+# Evicted the moment the NoExecute taint lands (no toleration at all).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: evicted-immediately
+  labels:
+    demo: noexecute
+spec:
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+---
+# Tolerates NoExecute but only for 30s, then it is evicted. Good for graceful drain-like behavior.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grace-30s
+  labels:
+    demo: noexecute
+spec:
+  tolerations:
+    - key: "maintenance"
+      operator: "Equal"
+      value: "true"
+      effect: "NoExecute"
+      tolerationSeconds: 30
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
+---
+# Tolerates NoExecute forever (no tolerationSeconds). Survives the taint.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stays-forever
+  labels:
+    demo: noexecute
+spec:
+  tolerations:
+    - key: "maintenance"
+      operator: "Exists"      # matches any value for this key
+      effect: "NoExecute"
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9

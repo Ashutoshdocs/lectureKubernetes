@@ -1,0 +1,77 @@
+ReplicaSet Practical – Create, Edit, Scale Up and Scale Down
+Step 1: Create or update the ReplicaSet from the YAML definition file
+
+kubectl apply -f replicaset.yaml
+
+Applies the replicaset.yaml configuration to create the ReplicaSet
+Step 2: Verify that the ReplicaSet has been created successfully
+
+kubectl get rs
+
+Lists all ReplicaSets with desired, current, and ready replica counts
+Step 3: Check the pods created by the ReplicaSet
+
+kubectl get pods -o wide
+
+Displays all pods with node, IP, and image details for better visibility
+Step 4: Verify which image is used by a specific pod
+
+kubectl describe pod <pod-name> | grep Image
+
+Shows the container image used in the specified pod
+Step 5: Increase the ReplicaSet replica count
+
+kubectl scale rs nginx-rs --replicas=5
+
+Increases the desired replica count to 5
+Step 6: Verify the increased replica count
+
+kubectl get rs
+
+Verify that DESIRED, CURRENT and READY replicas become 5
+Step 7: Verify the additional pods
+
+kubectl get pods -o wide
+
+Confirms that additional pods have been created
+Step 8: Decrease the ReplicaSet replica count
+
+kubectl scale rs nginx-rs --replicas=2
+
+Decreases the desired replica count to 2
+Step 9: Verify the decreased replica count
+
+kubectl get rs
+
+Verify that DESIRED, CURRENT and READY replicas become 2
+Step 10: Verify the remaining pods
+
+kubectl get pods -o wide
+
+Confirms that only 2 pods remain running
+Step 11: Edit the ReplicaSet configuration
+
+kubectl edit rs nginx-rs
+
+Opens the ReplicaSet definition in an editor for live modification
+For example, you can update the container image
+Step 12: Verify pods after editing the ReplicaSet
+
+kubectl get pods
+
+Lists current pods to check their status
+Step 13: Force pods to restart and use the new image/configuration
+
+kubectl delete pod -l app=nginx-rs
+
+Deletes pods with label app=nginx-rs; the ReplicaSet recreates them automatically
+Step 14: Confirm the new pods are running correctly
+
+kubectl get pods -o wide
+
+Shows the newly recreated pods and their configuration details
+Step 15: Verify the image of a new pod
+
+kubectl describe pod <pod-name> | grep Image
+
+Confirms which container image the recreated pod is using

@@ -1,0 +1,33 @@
+# ==============================================================================
+# 05 - PodDisruptionBudget: the #1 reason `kubectl drain` STALLS
+# ------------------------------------------------------------------------------
+# drain evicts pods through the Eviction API, which RESPECTS PodDisruptionBudgets.
+# A PDB says "at all times, keep at least N (or at most N unavailable) of these pods".
+#
+# If evicting the next pod would violate the budget, the Eviction API returns 429
+# (TooManyRequests) and drain retries FOREVER (until --timeout).
+#
+# This one demands all 4 web pods stay up => any eviction is blocked.
+# You will see drain print:
+#   "Cannot evict pod as it would violate the pod's disruption budget."
+#
+# THE FIX (any one):
+#   - lower minAvailable (e.g. to 3) so one pod can go at a time
+#   - scale the deployment up first
+#   - `kubectl delete pdb web-pdb`  (removes the guardrail)
+#
+# HARD BYPASS (dangerous — ignores the PDB entirely):
+#   drain has NO flag to skip PDBs. To bypass you must delete pods directly:
+#     kubectl delete pod <name> --grace-period=0 --force
+#   That skips the Eviction API (and thus the PDB) completely. See README.
+# ==============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-pdb
+spec:
+  # Try switching minAvailable between 4 (blocks) and 3 (allows one at a time).
+  minAvailable: 4
+  selector:
+    matchLabels:
+      app: web

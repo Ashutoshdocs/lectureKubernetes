@@ -1,0 +1,40 @@
+# ==============================================================================
+# 07 - A DaemonSet: silently BYPASSES drain, and its pods IGNORE cordon
+# ------------------------------------------------------------------------------
+# Two separate "bypass" behaviors live here:
+#
+# 1) CORDON is bypassed by the DaemonSet controller.
+#    cordon sets node.spec.unschedulable=true, which stops the DEFAULT SCHEDULER.
+#    But DaemonSet pods are placed by the DaemonSet controller, which ignores
+#    unschedulable. So a new DaemonSet pod can still land on a cordoned node.
+#
+# 2) DRAIN is bypassed too.
+#    drain will not evict DaemonSet-managed pods (it would just recreate them).
+#    Without --ignore-daemonsets, drain ERRORS and stops:
+#      error: cannot delete DaemonSet-managed Pods (use --ignore-daemonsets to ignore)
+#    With --ignore-daemonsets, drain proceeds but LEAVES these pods running on the node.
+#    => the node is "drained" yet still runs DaemonSet pods. That is expected.
+#
+# This DaemonSet also tolerates everything (see 03), which is typical for agents
+# (logging, CNI, node-exporter) and reinforces why they survive taints too.
+# ==============================================================================
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  labels:
+    app: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+    spec:
+      tolerations:
+        - operator: "Exists"   # run on every node, past every taint
+      containers:
+        - name: agent
+          image: registry.k8s.io/pause:3.9

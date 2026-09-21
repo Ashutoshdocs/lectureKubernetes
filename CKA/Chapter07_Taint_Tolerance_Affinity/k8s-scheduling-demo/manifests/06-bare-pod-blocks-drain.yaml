@@ -1,0 +1,23 @@
+# ==============================================================================
+# 06 - A BARE (unmanaged) pod: makes `kubectl drain` REFUSE to start
+# ------------------------------------------------------------------------------
+# A "bare" pod has no controller (no Deployment/ReplicaSet/Job/StatefulSet).
+# If drain evicted it, nothing would recreate it -> the workload would be lost.
+# So drain REFUSES up front unless you explicitly opt in:
+#
+#   error: cannot delete Pods declared no controller ... (use --force to override)
+#
+# BYPASS: `kubectl drain <node> --force`
+#   --force lets drain delete bare pods too. They are GONE for good (not rescheduled).
+#   This is the intended "yes I understand I'm destroying this pod" switch.
+# ==============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bare-pod
+  labels:
+    demo: drain-blockers
+spec:
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.9
