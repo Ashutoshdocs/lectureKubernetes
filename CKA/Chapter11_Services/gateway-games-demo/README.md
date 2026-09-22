@@ -77,14 +77,9 @@ gateway-games-demo/
 Skip if you already have a cluster.
 
 ```bash
-az group create --name akblaze-rg --location eastus
+az group create --name akblaze-rg --location centralus
 
-az aks create \
-  --resource-group akblaze-rg \
-  --name akblaze-aks \
-  --node-count 2 \
-  --node-vm-size Standard_B2s \
-  --generate-ssh-keys
+az aks create --resource-group akblaze-rg --name akblaze-aks  --node-count 2 --node-vm-size Standard_B2s --generate-ssh-keys
 
 az aks get-credentials --resource-group akblaze-rg --name akblaze-aks
 kubectl get nodes    # should list Ready nodes
