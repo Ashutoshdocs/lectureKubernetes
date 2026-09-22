@@ -13,7 +13,7 @@ spec:
     - name: games-gateway
       sectionName: tictactoe-http
   hostnames:
-    - "tiktaktoc.akblazeacademy.com"
+    - "tiktaktoc.akblazeacademy.net"
   rules:
     - matches:
         - path:
@@ -33,7 +33,7 @@ spec:
     - name: games-gateway
       sectionName: rps-http
   hostnames:
-    - "rps.akblazeacademy.com"
+    - "rps.akblazeacademy.net"
   rules:
     - matches:
         - path:

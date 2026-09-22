@@ -18,7 +18,7 @@ spec:
     - name: tictactoe-http
       protocol: HTTP
       port: 80
-      hostname: "tiktaktoc.akblazeacademy.com"
+      hostname: "tiktaktoc.akblazeacademy.net"
       allowedRoutes:
         namespaces:
           from: Same
@@ -26,7 +26,7 @@ spec:
     - name: rps-http
       protocol: HTTP
       port: 80
-      hostname: "rps.akblazeacademy.com"
+      hostname: "rps.akblazeacademy.net"
       allowedRoutes:
         namespaces:
           from: Same
