@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+# One Gateway, one public IP. Two hostname listeners share it:
+#   - tiktaktoc.akblazeacademy.com  -> Tic-Tac-Toe
+#   - rps.akblazeacademy.com        -> Rock Paper Scissors
+#
+# The GatewayClass "nginx" is created by the NGINX Gateway Fabric install
+# (see README). If you use a different implementation (Istio, Envoy Gateway,
+# Azure Application Gateway for Containers, etc.) change gatewayClassName below.
+# ---------------------------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: games-gateway
+  namespace: games
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: tictactoe-http
+      protocol: HTTP
+      port: 80
+      hostname: "tiktaktoc.akblazeacademy.com"
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+    - name: rps-http
+      protocol: HTTP
+      port: 80
+      hostname: "rps.akblazeacademy.com"
+      allowedRoutes:
+        namespaces:
+          from: Same

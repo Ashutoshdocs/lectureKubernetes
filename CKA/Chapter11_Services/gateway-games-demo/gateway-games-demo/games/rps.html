@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rock Paper Scissors · akblazeacademy</title>
+<style>
+  :root {
+    --bg-1: #1a2a6c;
+    --bg-2: #b21f1f;
+    --bg-3: #16222a;
+    --accent: #fdbb2d;
+    --win: #2ecc71;
+    --lose: #e74c3c;
+    --draw: #95a5a6;
+    --text: #f6f7fb;
+    --muted: #c3c9d6;
+    --card: rgba(255,255,255,0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+    background-size: 400% 400%;
+    animation: bgshift 20s ease infinite;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  @keyframes bgshift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .wrap { width: 100%; max-width: 480px; text-align: center; }
+  h1 {
+    font-size: clamp(1.7rem, 6vw, 2.5rem);
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 22px; }
+  .subtitle b { color: var(--accent); }
+
+  .scoreboard {
+    display: flex;
+    justify-content: space-around;
+    background: rgba(0,0,0,0.25);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 22px;
+  }
+  .score .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .score .value { font-size: 1.7rem; font-weight: 800; display: block; }
+  .score.you .value { color: var(--win); }
+  .score.cpu .value { color: var(--lose); }
+  .score.tie .value { color: var(--draw); }
+
+  .arena {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 8px;
+    margin-bottom: 8px;
+    min-height: 130px;
+  }
+  .hand {
+    font-size: clamp(3.2rem, 18vw, 5rem);
+    width: 1.6em;
+    height: 1.6em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .hand.you { transform: scaleX(-1); }
+  .hand.shake { animation: shake 0.5s ease; }
+  @keyframes shake {
+    0%,100% { transform: translateY(0) scaleX(1); }
+    25% { transform: translateY(-14px) scaleX(1); }
+    75% { transform: translateY(6px) scaleX(1); }
+  }
+  .hand.you.shake { animation: shakeYou 0.5s ease; }
+  @keyframes shakeYou {
+    0%,100% { transform: translateY(0) scaleX(-1); }
+    25% { transform: translateY(-14px) scaleX(-1); }
+    75% { transform: translateY(6px) scaleX(-1); }
+  }
+  .vs { font-size: 1rem; font-weight: 800; color: var(--accent); letter-spacing: 1px; }
+  .who { display: flex; justify-content: space-around; color: var(--muted); font-size: 0.8rem; margin-bottom: 14px; }
+  .who span { width: 40%; }
+
+  .result {
+    font-size: 1.3rem;
+    font-weight: 800;
+    min-height: 1.5em;
+    margin-bottom: 20px;
+    transition: color 0.3s;
+  }
+
+  .choices { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
+  .choice {
+    font-size: clamp(2rem, 9vw, 2.8rem);
+    width: 1.9em;
+    height: 1.9em;
+    border-radius: 22px;
+    background: var(--card);
+    border: 2px solid rgba(255,255,255,0.12);
+    cursor: pointer;
+    transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .choice:hover { transform: translateY(-4px) scale(1.05); background: rgba(255,255,255,0.16); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+  .choice:active { transform: translateY(0) scale(0.98); }
+  .choice.chosen { border-color: var(--accent); box-shadow: 0 0 20px rgba(253,187,45,0.5); }
+  .choice.disabled { pointer-events: none; opacity: 0.55; }
+  .choice .name { display: none; }
+
+  .reset {
+    background: linear-gradient(90deg, var(--accent), #ff7e5f);
+    color: #1a1a2e;
+    border: none;
+    padding: 11px 26px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .reset:hover { transform: translateY(-2px); }
+
+  .hint { color: var(--muted); font-size: 0.8rem; margin-bottom: 14px; }
+  .footer { margin-top: 22px; color: var(--muted); font-size: 0.72rem; opacity: 0.7; }
+  .footer code { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>✊ Rock Paper Scissors ✌️</h1>
+    <p class="subtitle">Served via Kubernetes Gateway API · <b>rps.akblazeacademy.com</b></p>
+
+    <div class="scoreboard">
+      <div class="score you"><span class="label">You</span><span class="value" id="scoreYou">0</span></div>
+      <div class="score tie"><span class="label">Draws</span><span class="value" id="scoreTie">0</span></div>
+      <div class="score cpu"><span class="label">Computer</span><span class="value" id="scoreCpu">0</span></div>
+    </div>
+
+    <div class="arena">
+      <div class="hand you" id="handYou">✊</div>
+      <div class="vs">VS</div>
+      <div class="hand cpu" id="handCpu">✊</div>
+    </div>
+    <div class="who"><span>You</span><span>Computer</span></div>
+
+    <div class="result" id="result">Choose your weapon!</div>
+
+    <p class="hint">First to feel like a champion wins 😎</p>
+
+    <div class="choices" id="choices">
+      <div class="choice" data-move="rock" title="Rock">✊<span class="name">Rock</span></div>
+      <div class="choice" data-move="paper" title="Paper">✋<span class="name">Paper</span></div>
+      <div class="choice" data-move="scissors" title="Scissors">✌️<span class="name">Scissors</span></div>
+    </div>
+
+    <button class="reset" id="reset">Reset Score</button>
+
+    <p class="footer">Pod: <code id="host">loading…</code></p>
+  </div>
+
+<script>
+(function () {
+  const EMOJI = { rock: '✊', paper: '✋', scissors: '✌️' };
+  const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+  const MOVES = ['rock', 'paper', 'scissors'];
+
+  const handYou = document.getElementById('handYou');
+  const handCpu = document.getElementById('handCpu');
+  const resultEl = document.getElementById('result');
+  const choicesEl = document.getElementById('choices');
+  const scoreYouEl = document.getElementById('scoreYou');
+  const scoreCpuEl = document.getElementById('scoreCpu');
+  const scoreTieEl = document.getElementById('scoreTie');
+
+  const scores = { you: 0, cpu: 0, tie: 0 };
+  let busy = false;
+
+  function play(playerMove) {
+    if (busy) return;
+    busy = true;
+
+    document.querySelectorAll('.choice').forEach(c => {
+      c.classList.add('disabled');
+      c.classList.toggle('chosen', c.dataset.move === playerMove);
+    });
+
+    handYou.textContent = '✊';
+    handCpu.textContent = '✊';
+    handYou.classList.add('shake');
+    handCpu.classList.add('shake');
+    resultEl.textContent = 'Rock… Paper… Scissors…';
+    resultEl.style.color = 'var(--muted)';
+
+    setTimeout(() => {
+      handYou.classList.remove('shake');
+      handCpu.classList.remove('shake');
+
+      const cpuMove = MOVES[Math.floor(Math.random() * 3)];
+      handYou.textContent = EMOJI[playerMove];
+      handCpu.textContent = EMOJI[cpuMove];
+
+      let outcome;
+      if (playerMove === cpuMove) {
+        outcome = 'draw';
+        scores.tie++;
+        resultEl.textContent = 'Draw! Both chose ' + playerMove + ' 🤝';
+        resultEl.style.color = 'var(--draw)';
+      } else if (BEATS[playerMove] === cpuMove) {
+        outcome = 'win';
+        scores.you++;
+        resultEl.textContent = 'You win! ' + cap(playerMove) + ' beats ' + cpuMove + ' 🎉';
+        resultEl.style.color = 'var(--win)';
+      } else {
+        outcome = 'lose';
+        scores.cpu++;
+        resultEl.textContent = 'You lose! ' + cap(cpuMove) + ' beats ' + playerMove + ' 😵';
+        resultEl.style.color = 'var(--lose)';
+      }
+
+      render();
+
+      setTimeout(() => {
+        document.querySelectorAll('.choice').forEach(c => {
+          c.classList.remove('disabled', 'chosen');
+        });
+        busy = false;
+      }, 700);
+    }, 700);
+  }
+
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function render() {
+    scoreYouEl.textContent = scores.you;
+    scoreCpuEl.textContent = scores.cpu;
+    scoreTieEl.textContent = scores.tie;
+  }
+
+  choicesEl.addEventListener('click', e => {
+    const choice = e.target.closest('.choice');
+    if (choice) play(choice.dataset.move);
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    scores.you = scores.cpu = scores.tie = 0;
+    render();
+    resultEl.textContent = 'Choose your weapon!';
+    resultEl.style.color = 'var(--text)';
+    handYou.textContent = '✊';
+    handCpu.textContent = '✊';
+  });
+
+  try { document.getElementById('host').textContent = location.hostname; } catch (e) {}
+})();
+</script>
+</body>
+</html>

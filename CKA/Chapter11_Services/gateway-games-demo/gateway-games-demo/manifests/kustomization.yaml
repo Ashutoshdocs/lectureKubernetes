@@ -1,0 +1,12 @@
+# Apply everything in dependency order with:  kubectl apply -k manifests/
+# (or plain:  kubectl apply -f manifests/)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespace.yaml
+  - 10-gateway.yaml
+  - 20-tictactoe-configmap.yaml
+  - 21-rps-configmap.yaml
+  - 30-tictactoe.yaml
+  - 31-rps.yaml
+  - 40-httproutes.yaml

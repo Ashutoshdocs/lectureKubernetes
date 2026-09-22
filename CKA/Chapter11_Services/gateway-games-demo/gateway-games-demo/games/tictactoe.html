@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tic-Tac-Toe · akblazeacademy</title>
+<style>
+  :root {
+    --bg-1: #0f0c29;
+    --bg-2: #302b63;
+    --bg-3: #24243e;
+    --x-color: #ff6b9d;
+    --o-color: #4ecdc4;
+    --cell-bg: rgba(255, 255, 255, 0.06);
+    --cell-hover: rgba(255, 255, 255, 0.14);
+    --text: #f5f5fa;
+    --muted: #a9a7c9;
+    --win: #ffd93d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2), var(--bg-3));
+    background-size: 400% 400%;
+    animation: bgshift 18s ease infinite;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  @keyframes bgshift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .wrap {
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 6vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, var(--x-color), var(--o-color));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .subtitle b { color: var(--o-color); }
+
+  .modes { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .mode-btn {
+    background: var(--cell-bg);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--muted);
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .mode-btn.active {
+    background: linear-gradient(90deg, var(--x-color), var(--o-color));
+    color: #1a1a2e;
+    font-weight: 700;
+    border-color: transparent;
+  }
+
+  .status {
+    font-size: 1.15rem;
+    font-weight: 600;
+    min-height: 1.6em;
+    margin-bottom: 16px;
+    transition: color 0.3s;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    aspect-ratio: 1;
+    margin: 0 auto 20px;
+    perspective: 800px;
+  }
+  .cell {
+    background: var(--cell-bg);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(2.4rem, 14vw, 4rem);
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    user-select: none;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .cell:hover:not(.filled) { background: var(--cell-hover); transform: translateY(-2px); }
+  .cell.x { color: var(--x-color); }
+  .cell.o { color: var(--o-color); }
+  .cell.filled { cursor: default; }
+  .cell.win { background: rgba(255, 217, 61, 0.22); box-shadow: 0 0 24px rgba(255,217,61,0.5); }
+  .cell .mark { display: inline-block; animation: pop 0.28s cubic-bezier(.2,1.4,.5,1); }
+  @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .scoreboard {
+    display: flex;
+    justify-content: space-around;
+    background: rgba(0,0,0,0.22);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+  .score { display: flex; flex-direction: column; gap: 2px; }
+  .score .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .score .value { font-size: 1.5rem; font-weight: 800; }
+  .score.x .value { color: var(--x-color); }
+  .score.o .value { color: var(--o-color); }
+  .score.tie .value { color: var(--muted); }
+
+  .reset {
+    background: linear-gradient(90deg, var(--x-color), var(--o-color));
+    color: #1a1a2e;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 6px 20px rgba(78,205,196,0.3);
+  }
+  .reset:hover { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(255,107,157,0.4); }
+  .reset:active { transform: translateY(0); }
+
+  .footer { margin-top: 22px; color: var(--muted); font-size: 0.72rem; opacity: 0.7; }
+  .footer code { color: var(--o-color); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Tic-Tac-Toe</h1>
+    <p class="subtitle">Served via Kubernetes Gateway API · <b>tiktaktoc.akblazeacademy.com</b></p>
+
+    <div class="modes">
+      <button class="mode-btn active" data-mode="ai">You vs Computer</button>
+      <button class="mode-btn" data-mode="pvp">2 Players</button>
+    </div>
+
+    <div class="status" id="status">Your turn — you are X</div>
+
+    <div class="board" id="board"></div>
+
+    <div class="scoreboard">
+      <div class="score x"><span class="label">X wins</span><span class="value" id="scoreX">0</span></div>
+      <div class="score tie"><span class="label">Draws</span><span class="value" id="scoreTie">0</span></div>
+      <div class="score o"><span class="label">O wins</span><span class="value" id="scoreO">0</span></div>
+    </div>
+
+    <button class="reset" id="reset">New Round</button>
+
+    <p class="footer">Pod: <code id="host">loading…</code></p>
+  </div>
+
+<script>
+(function () {
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const resetBtn = document.getElementById('reset');
+  const scoreXEl = document.getElementById('scoreX');
+  const scoreOEl = document.getElementById('scoreO');
+  const scoreTieEl = document.getElementById('scoreTie');
+
+  let board, current, running, mode = 'ai';
+  const scores = { X: 0, O: 0, tie: 0 };
+  const WINS = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  function init() {
+    board = Array(9).fill('');
+    current = 'X';
+    running = true;
+    boardEl.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+      const c = document.createElement('div');
+      c.className = 'cell';
+      c.dataset.i = i;
+      c.addEventListener('click', onCell);
+      boardEl.appendChild(c);
+    }
+    setStatus(mode === 'ai' ? 'Your turn — you are X' : "Player X's turn");
+  }
+
+  function setStatus(text, color) {
+    statusEl.textContent = text;
+    statusEl.style.color = color || 'var(--text)';
+  }
+
+  function onCell(e) {
+    const i = +e.currentTarget.dataset.i;
+    if (!running || board[i]) return;
+    if (mode === 'ai' && current === 'O') return;
+    place(i, current);
+    if (!postMove()) return;
+    if (mode === 'ai' && running && current === 'O') {
+      setStatus('Computer is thinking…', 'var(--muted)');
+      setTimeout(aiMove, 480);
+    }
+  }
+
+  function place(i, player) {
+    board[i] = player;
+    const cell = boardEl.children[i];
+    cell.classList.add('filled', player.toLowerCase());
+    cell.innerHTML = '<span class="mark">' + player + '</span>';
+  }
+
+  // returns true if the game continues
+  function postMove() {
+    const result = evaluate(board);
+    if (result) {
+      finish(result);
+      return false;
+    }
+    current = current === 'X' ? 'O' : 'X';
+    if (running) {
+      if (mode === 'ai') {
+        setStatus(current === 'X' ? 'Your turn' : 'Computer is thinking…',
+                  current === 'X' ? 'var(--text)' : 'var(--muted)');
+      } else {
+        setStatus("Player " + current + "'s turn",
+                  current === 'X' ? 'var(--x-color)' : 'var(--o-color)');
+      }
+    }
+    return true;
+  }
+
+  function evaluate(bd) {
+    for (const line of WINS) {
+      const [a,b,c] = line;
+      if (bd[a] && bd[a] === bd[b] && bd[a] === bd[c]) {
+        return { winner: bd[a], line };
+      }
+    }
+    if (bd.every(Boolean)) return { winner: null, line: null };
+    return null;
+  }
+
+  function finish(result) {
+    running = false;
+    if (result.winner) {
+      result.line.forEach(i => boardEl.children[i].classList.add('win'));
+      scores[result.winner]++;
+      if (mode === 'ai') {
+        setStatus(result.winner === 'X' ? 'You win! 🎉' : 'Computer wins 🤖',
+                  result.winner === 'X' ? 'var(--x-color)' : 'var(--o-color)');
+      } else {
+        setStatus('Player ' + result.winner + ' wins! 🎉',
+                  result.winner === 'X' ? 'var(--x-color)' : 'var(--o-color)');
+      }
+    } else {
+      scores.tie++;
+      setStatus("It's a draw 🤝", 'var(--win)');
+    }
+    render();
+  }
+
+  function render() {
+    scoreXEl.textContent = scores.X;
+    scoreOEl.textContent = scores.O;
+    scoreTieEl.textContent = scores.tie;
+  }
+
+  // Unbeatable AI via minimax
+  function aiMove() {
+    if (!running) return;
+    const best = minimax(board.slice(), 'O');
+    place(best.index, 'O');
+    postMove();
+  }
+
+  function minimax(bd, player) {
+    const avail = bd.map((v, i) => v ? null : i).filter(v => v !== null);
+    const res = evaluate(bd);
+    if (res) {
+      if (res.winner === 'O') return { score: 10 };
+      if (res.winner === 'X') return { score: -10 };
+      return { score: 0 };
+    }
+    const moves = [];
+    for (const i of avail) {
+      bd[i] = player;
+      const result = minimax(bd, player === 'O' ? 'X' : 'O');
+      moves.push({ index: i, score: result.score });
+      bd[i] = '';
+    }
+    let best;
+    if (player === 'O') {
+      let bestScore = -Infinity;
+      for (const m of moves) if (m.score > bestScore) { bestScore = m.score; best = m; }
+    } else {
+      let bestScore = Infinity;
+      for (const m of moves) if (m.score < bestScore) { bestScore = m.score; best = m; }
+    }
+    return best;
+  }
+
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      init();
+    });
+  });
+
+  resetBtn.addEventListener('click', init);
+
+  // Show which pod served this page (informational)
+  try {
+    document.getElementById('host').textContent = location.hostname;
+  } catch (e) {}
+
+  init();
+})();
+</script>
+</body>
+</html>

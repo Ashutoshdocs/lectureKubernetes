@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# HTTPRoutes bind each hostname to its backend Service.
+# Each route attaches to the matching listener on the shared Gateway via
+# the parentRef sectionName.
+# ---------------------------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tictactoe-route
+  namespace: games
+spec:
+  parentRefs:
+    - name: games-gateway
+      sectionName: tictactoe-http
+  hostnames:
+    - "tiktaktoc.akblazeacademy.com"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: tictactoe
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rps-route
+  namespace: games
+spec:
+  parentRefs:
+    - name: games-gateway
+      sectionName: rps-http
+  hostnames:
+    - "rps.akblazeacademy.com"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: rps
+          port: 80

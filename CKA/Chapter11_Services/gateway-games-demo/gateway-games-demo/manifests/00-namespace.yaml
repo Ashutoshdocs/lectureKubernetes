@@ -1,0 +1,9 @@
+# ---------------------------------------------------------------------------
+# Namespace that holds both games and the shared Gateway.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: games
+  labels:
+    app.kubernetes.io/part-of: gateway-games-demo
