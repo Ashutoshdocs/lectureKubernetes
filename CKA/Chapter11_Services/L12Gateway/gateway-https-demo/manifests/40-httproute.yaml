@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------------
+# One HTTPRoute, three path rules on the same hostname, attached ONLY to the
+# HTTPS listener. Plain-HTTP requests never reach it; they are redirected by
+# 41-http-redirect.yaml first.
+#
+#   https://akblazeacademy.net/app1/...  -> Service app1  (Pod sees /...)
+#   https://akblazeacademy.net/app2/...  -> Service app2  (Pod sees /...)
+#   https://akblazeacademy.net/...       -> Service home  (landing page)
+#
+# TLS ends at the Gateway. Gateway -> Pod traffic inside the cluster is plain
+# HTTP on port 80, so the apps need no certificates or code changes.
+#
+# The Gateway picks the LONGEST matching prefix, so /app1 and /app2 win over /
+# no matter what order the rules are written in.
+#
+# The URLRewrite filter strips the prefix before the request reaches the Pod:
+#   /app1/         -> /
+#   /app1/whoami   -> /whoami
+# so each app can be built as if it lived at the site root. Without it, nginx
+# in the Pod would look for /usr/share/nginx/html/app1/index.html and 404.
+#
+# PathPrefix matches whole path segments: /app1 matches /app1 and /app1/x,
+# but NOT /app10.
+# ---------------------------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: akblaze-routes
+  namespace: webapps
+spec:
+  parentRefs:
+    - name: akblaze-gateway
+      sectionName: https
+  hostnames:
+    - "akblazeacademy.net"
+  rules:
+    # ---- /app1 -> TaskFlow ------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /app1
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: app1
+          port: 80
+
+    # ---- /app2 -> Spendly -------------------------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /app2
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: app2
+          port: 80
+
+    # ---- everything else -> landing page ---------------------------------
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: home
+          port: 80

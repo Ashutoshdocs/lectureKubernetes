@@ -1,0 +1,4 @@
+# certbot account, private keys and certificates. Never commit these.
+.certbot/
+*.pem
+*.key

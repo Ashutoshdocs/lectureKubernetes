@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Plain HTTP -> HTTPS redirect.
+#
+# Attached only to the port-80 "http" listener. Every request, whatever the
+# path, gets a 301 to the same URL on https:
+#
+#   http://akblazeacademy.net/app1/  ->  301  https://akblazeacademy.net/app1/
+#
+# The redirect keeps the original path and query string; only the scheme
+# (and therefore the port) changes.
+# ---------------------------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: akblaze-http-redirect
+  namespace: webapps
+spec:
+  parentRefs:
+    - name: akblaze-gateway
+      sectionName: http
+  hostnames:
+    - "akblazeacademy.net"
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

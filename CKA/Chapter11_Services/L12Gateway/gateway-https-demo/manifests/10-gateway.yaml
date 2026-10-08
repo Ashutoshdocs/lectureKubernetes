@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# One Gateway, one public IP, one hostname, TWO listeners:
+#
+#   http   port 80   -> only redirects to https (41-http-redirect.yaml)
+#   https  port 443  -> terminates TLS, then path routing (40-httproute.yaml)
+#
+# TLS uses the certificate in the Secret "akblaze-tls". That Secret is NOT in
+# this folder: scripts/issue-cert.sh gets a Let's Encrypt certificate with
+# certbot and loads it into the cluster. Until the Secret exists, the https
+# listener reports ResolvedRefs=False and serves nothing.
+#
+# The GatewayClass "nginx" is created by the NGINX Gateway Fabric install
+# (see README). If you use a different implementation (Istio, Envoy Gateway,
+# Azure Application Gateway for Containers, etc.) change gatewayClassName below.
+# ---------------------------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: akblaze-gateway
+  namespace: webapps
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "akblazeacademy.net"
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "akblazeacademy.net"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            group: ""
+            name: akblaze-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
