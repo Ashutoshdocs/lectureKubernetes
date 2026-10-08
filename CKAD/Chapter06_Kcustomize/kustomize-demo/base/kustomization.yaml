@@ -1,39 +1,39 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# 1. The raw manifests this base owns
 resources:
   - deployment.yaml
   - service.yaml
 
-# 2. Labels added to every object.
-#    `labels` replaces the deprecated `commonLabels`.
-#    includeSelectors: true  -> also added to selectors (Deployment, Service, PDB...)
-#    Only do this in the BASE: selectors are immutable once deployed.
+# Labels on every object AND on pod templates (pods read `environment` into the page).
+# Selectors are left alone so overlays can change the value safely.
 labels:
   - pairs:
-      app.kubernetes.io/name: student-app
-      app.kubernetes.io/part-of: kustomize-demo
-    includeSelectors: true
+      environment: base
+    includeSelectors: false
+    includeTemplates: true
 
-# 3. Generated ConfigMaps. Kustomize appends a content hash to the name
-#    (student-config-abc123) and updates every reference to it.
-#    Change a value -> new hash -> Deployment rolls automatically.
+commonAnnotations:
+  kustomize.demo/layer: base
+
 configMapGenerator:
+  # App settings -> env vars. Overlays MERGE into this to change colour/message.
   - name: student-config
     literals:
-      - COURSE=DevOps
-      - TRAINER=Ashutosh
-      - APP_ENV=base
-      - LOG_LEVEL=info
+      - APP_COURSE=DevOps
+      - APP_TRAINER=Ashutosh
+      - "APP_MESSAGE=Rendered straight from the base. No overlay applied."
+      - "APP_COLOR=#64748b"
+  # The ONE web page. It lives only in base; overlays never copy it.
   - name: student-html
     files:
-      - index.html=html/index.html
+      - html/index.html
+  - name: student-nginx-conf
+    files:
+      - nginx/default.conf.template
 
-# 4. Generated Secret with safe placeholder values.
-#    Overlays replace these (prod reads them from a .env file).
 secretGenerator:
   - name: student-secret
     literals:
-      - DB_USER=placeholder
-      - DB_PASSWORD=placeholder
+      - username=admin
+      - password=Pass@123

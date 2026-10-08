@@ -1,427 +1,615 @@
-# Kustomize End-to-End Lab — Student App
+<div align="center">
 
-Deploy **one application** into **three environments** (dev, staging, prod) without ever editing the original YAML.
+# ☸️ Kustomize End-to-End Practical
 
-By the end, students can explain and use: bases, overlays, namespaces, name prefixes/suffixes, labels and annotations, replica and image overrides, ConfigMap and Secret generators (with hash-based rollouts), three kinds of patches, and reusable **components**.
+### One base. Two overlays. Three live web pages that prove it.
 
-| | |
-|---|---|
-| **Duration** | ~2.5 hours (10 modules, 10–20 min each) |
-| **Level** | Knows `kubectl apply`, Deployments and Services |
-| **Needs** | A cluster (kind, minikube, Docker Desktop) and `kubectl` ≥ 1.27 |
+![kubectl](https://img.shields.io/badge/kubectl-built--in%20kustomize-326CE5?logo=kubernetes&logoColor=white)
+![Kustomize](https://img.shields.io/badge/kustomize-v5-326CE5)
+![nginx](https://img.shields.io/badge/nginx-alpine-009639?logo=nginx&logoColor=white)
+![Services](https://img.shields.io/badge/Services-NodePort-orange)
+
+</div>
 
 ---
 
-## Project layout
+## 🎯 Objective
 
-```
-kustomize-demo/
-├── base/                         # Shared truth — overlays never edit this
-│   ├── deployment.yaml           # nginx, probes, resources, envFrom, html volume
-│   ├── service.yaml
-│   ├── html/index.html           # grey "BASE" page
-│   └── kustomization.yaml        # labels + ConfigMap/Secret generators
-│
-├── components/                   # Reusable, opt-in features
-│   ├── hpa/                      # HorizontalPodAutoscaler
-│   ├── pdb/                      # PodDisruptionBudget
-│   └── monitoring/               # Patch: Prometheus scrape annotations
-│
-├── overlays/
-│   ├── dev/                      # 1 replica, debug logs, green page
-│   ├── staging/                  # nameSuffix, registry mirror, HPA, orange page
-│   └── prod/                     # pinned image, HPA+PDB+monitoring, 3 patch styles, red page
-│       ├── patches/
-│       │   ├── resources.yaml            # strategic merge patch
-│       │   └── add-env.json6902.yaml     # JSON 6902 patch
-│       ├── secrets.env.example           # copy to secrets.env (git-ignored)
-│       └── kustomization.yaml
-│
-├── scripts/
-│   ├── validate.sh               # build every overlay (CI-friendly)
-│   └── compare-envs.sh           # diff two rendered environments
-├── Makefile                      # make build|diff|apply|status|open|delete ENV=dev
-└── .gitignore
-```
+Deploy the **same** application into **BASE**, **DEV** and **PROD** without editing the original YAML.
+Each environment is exposed on its **own NodePort** and serves the **same HTML page**, which reads live
+values from its pod and shows, row by row, **what came from base and what the overlay changed**.
 
-**What students see:** each environment serves a different coloured web page, so the effect of an overlay is visible in the browser, not just in YAML.
-
-| Env | Namespace | Names | Replicas | Image | Extras | Page |
+| Environment | Command | Namespace | NodePort | Replicas | Image | Page colour |
 |---|---|---|---|---|---|---|
-| dev | `student-dev` | `dev-*` | 1 | `nginx:1.27-alpine` | debug logs | 🟢 green |
-| staging | `student-staging` | `stg-*-v2` | 2 → HPA | `public.ecr.aws/nginx/nginx:1.27-alpine` | HPA | 🟠 orange |
-| prod | `student-prod` | `prod-*` | 3 → HPA | `nginx:1.27.3-alpine` | HPA, PDB, monitoring, patches, NodePort | 🔴 red |
+| **BASE** | `kubectl apply -k base -n base` | `base` | **30080** | 1 | `nginx:1.25-alpine` | ⚪ slate |
+| **DEV** | `kubectl apply -k overlays/dev` | `dev` | **30081** | 1 | `nginx:1.25-alpine` | 🔵 blue |
+| **PROD** | `kubectl apply -k overlays/prod` | `prod` | **30082** | 3 | `nginx:1.27-alpine` | 🟢 green |
+
+> 💡 **The proof:** `index.html` exists **only** in `base/html/`. Dev and prod never copy it, yet each
+> page looks different. Every difference comes from Kustomize transforming the manifests.
 
 ---
 
-## Module 0 — Setup (10 min)
+## 🧭 How it works
 
-```bash
-kubectl version --client          # Kustomize is built in: kubectl kustomize / apply -k
-kubectl cluster-info
-
-# Optional: standalone binary (newer features, faster)
-kustomize version
-
-# Local cluster if you don't have one
-kind create cluster --name kustomize-lab
-
-# Prod reads its secret from a git-ignored file
-cp overlays/prod/secrets.env.example overlays/prod/secrets.env
+```text
+                     ┌──────────────────────────────────────────┐
+                     │                 base/                     │
+                     │  deployment.yaml   service.yaml (30080)   │
+                     │  html/index.html   nginx/*.template       │
+                     │  configMapGenerator · secretGenerator     │
+                     └───────────────┬──────────────────────────┘
+                                     │  resources: - ../../base
+                   ┌─────────────────┴─────────────────┐
+                   ▼                                   ▼
+     ┌───────────────────────────┐       ┌───────────────────────────┐
+     │      overlays/dev         │       │      overlays/prod        │
+     │  namespace: dev           │       │  namespace: prod          │
+     │  namePrefix: dev-         │       │  namePrefix: prod-        │
+     │  replicas: 1              │       │  replicas: 3              │
+     │  label env=development    │       │  label env=production     │
+     │  ConfigMap merge (blue)   │       │  images: newTag 1.27      │
+     │  JSON patch → 30081       │       │  SMP patch → bigger limits│
+     │                           │       │  JSON patch → 30082       │
+     └─────────────┬─────────────┘       └─────────────┬─────────────┘
+                   ▼                                   ▼
+          http://<node>:30081                 http://<node>:30082
 ```
 
-> **Teaching note:** `kubectl kustomize` bundles a specific Kustomize version. Run `kubectl version --client -o yaml` to see it. This lab works with Kustomize v5+ (kubectl 1.27+).
+**How the page knows** — every value on screen is real, read inside the pod:
 
----
-
-## Module 1 — The base (15 min)
-
-**Goal:** understand that a base is plain, valid Kubernetes YAML plus a `kustomization.yaml` that lists it.
-
-```bash
-cat base/kustomization.yaml
-kubectl kustomize base
-```
-
-**Observe:**
-
-- `student-config-<hash>`, `student-html-<hash>` and `student-secret-<hash>` were **generated** — they don't exist as files.
-- The Deployment's `envFrom` and `volumes` now point at the **hashed** names. Kustomize rewrote the references for you.
-- `app.kubernetes.io/name` and `part-of` appear on every object **and** inside the Deployment/Service selectors (`includeSelectors: true`).
-
-> **Teaching note — why hashes matter:** change `LOG_LEVEL=info` to `LOG_LEVEL=error` in `base/kustomization.yaml` and re-run the build. The ConfigMap name changes → the Deployment spec changes → pods roll automatically. Without the hash, a ConfigMap edit leaves running pods on stale config. Revert the change afterwards.
-
----
-
-## Module 2 — Dev overlay: namespace, prefix, replicas (15 min)
-
-```bash
-cat overlays/dev/kustomization.yaml
-kubectl kustomize overlays/dev
-```
-
-**Observe:**
-
-| Field | Base | Dev |
+| On the page | Where it comes from | Changed by |
 |---|---|---|
-| Deployment name | `student-app` | `dev-student-app` |
-| Namespace | *(none)* | `student-dev` |
-| Replicas | 2 | 1 |
-| `APP_ENV` | base | dev |
-| Labels | — | `environment: development`, `owner: devops` |
+| Namespace, pod name, node, IP | Downward API `fieldRef` | `namespace:`, `namePrefix:` |
+| `environment` label | Downward API `metadata.labels` | `labels:` |
+| Layer annotation | Downward API `metadata.annotations` | `commonAnnotations:` |
+| CPU / memory limits | Downward API `resourceFieldRef` | strategic-merge patch |
+| nginx version | nginx's own `$nginx_version` | `images:` |
+| Colour & message | `configMapGenerator` → env | `behavior: merge` |
+| Secret username | `secretGenerator` → env | (inherited from base) |
+| NodePort | browser URL port | JSON6902 patch |
 
-Show the full diff in one command:
-
-```bash
-./scripts/compare-envs.sh base dev
-```
-
-> **Teaching note:** `replicas:` uses the **base** name (`student-app`), not `dev-student-app`. Transformers like `namePrefix` run *last*, after replicas, images and patches have matched.
+nginx serves these as JSON on `/info`; `index.html` compares them with the base defaults and badges each
+row **from base** 🟩 or **overlay** 🟧.
 
 ---
 
-## Module 3 — Deploy and verify dev (15 min)
+## 📁 Project structure
 
-```bash
-kubectl diff -k overlays/dev        # preview cluster changes (empty namespace → all new)
-kubectl apply -k overlays/dev       # namespace.yaml is in the overlay — no manual create
-kubectl -n student-dev rollout status deploy/dev-student-app
-
-kubectl -n student-dev get all,cm,secret --show-labels
-kubectl -n student-dev describe deploy dev-student-app
-
-# See it in the browser → http://localhost:8080 (green page)
-kubectl -n student-dev port-forward svc/dev-student-service 8080:80
+```text
+kustomize-demo/
+├── README.md
+├── base/
+│   ├── kustomization.yaml          # resources, labels, annotations, generators
+│   ├── deployment.yaml             # nginx + Downward API env vars
+│   ├── service.yaml                # NodePort 30080
+│   ├── html/
+│   │   └── index.html              # the ONE page (→ ConfigMap student-html)
+│   └── nginx/
+│       └── default.conf.template   # serves / , /info , /healthz
+└── overlays/
+    ├── dev/
+    │   └── kustomization.yaml      # ns, prefix, 1 replica, merge, port 30081
+    └── prod/
+        ├── kustomization.yaml      # ns, prefix, 3 replicas, image, port 30082
+        └── resources-patch.yaml    # strategic-merge patch: bigger limits
 ```
-
-Check config reached the container:
-
-```bash
-kubectl -n student-dev exec deploy/dev-student-app -- env | grep -E 'APP_ENV|LOG_LEVEL|DB_'
-```
-
-Shortcut for every step above: `make apply ENV=dev && make status ENV=dev && make open ENV=dev`.
 
 ---
 
-## Module 4 — Generators in depth: merge vs replace (15 min)
+## ✅ Step 0 — Installation check
 
-Dev's `kustomization.yaml` shows both behaviours:
+```bash
+kubectl version --client
+kubectl kustomize --help
+# optional standalone binary
+kustomize version
+```
+
+Any cluster with reachable node ports works: **minikube**, **kind** (map ports 30080-30082), **k3s**, or a cloud VM.
+
+---
+
+## 🧱 Step 1 — The base
+
+### `base/deployment.yaml` (key parts)
 
 ```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: student
+  template:
+    metadata:
+      labels:
+        app: student
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine          # prod overlay overrides the tag
+          env:
+            - name: POD_NAMESPACE           # changed by overlay `namespace:`
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            - name: ENV_LABEL               # changed by overlay `labels:`
+              valueFrom: { fieldRef: { fieldPath: "metadata.labels['environment']" } }
+            - name: LAYER                   # changed by `commonAnnotations:`
+              valueFrom: { fieldRef: { fieldPath: "metadata.annotations['kustomize.demo/layer']" } }
+            - name: CPU_LIMIT               # changed by prod patch
+              valueFrom: { resourceFieldRef: { resource: limits.cpu, divisor: 1m } }
+            - name: SECRET_USER             # from secretGenerator
+              valueFrom: { secretKeyRef: { name: student-secret, key: username } }
+            # ... POD_NAME, POD_IP, NODE_NAME, MEM_LIMIT
+          envFrom:
+            - configMapRef:
+                name: student-config        # from configMapGenerator
+          resources:
+            requests: { cpu: 50m,  memory: 32Mi }
+            limits:   { cpu: 100m, memory: 64Mi }
+          volumeMounts:
+            - { name: html,            mountPath: /usr/share/nginx/html }
+            - { name: nginx-templates, mountPath: /etc/nginx/templates }
+      volumes:
+        - { name: html,            configMap: { name: student-html } }
+        - { name: nginx-templates, configMap: { name: student-nginx-conf } }
+```
+
+### `base/service.yaml`
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-service
+spec:
+  type: NodePort
+  selector:
+    app: student
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+```
+
+### `base/kustomization.yaml`
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+labels:
+  - pairs:
+      environment: base
+    includeSelectors: false
+    includeTemplates: true
+
+commonAnnotations:
+  kustomize.demo/layer: base
+
 configMapGenerator:
   - name: student-config
-    behavior: merge       # keep COURSE, TRAINER; override APP_ENV, LOG_LEVEL
+    literals:
+      - APP_COURSE=DevOps
+      - APP_TRAINER=Ashutosh
+      - "APP_MESSAGE=Rendered straight from the base. No overlay applied."
+      - "APP_COLOR=#64748b"
   - name: student-html
-    behavior: replace     # throw away the base page entirely
+    files:
+      - html/index.html
+  - name: student-nginx-conf
+    files:
+      - nginx/default.conf.template
+
+secretGenerator:
+  - name: student-secret
+    literals:
+      - username=admin
+      - password=Pass@123
 ```
 
-**Live demo — trigger a rollout from a config change:**
+> ⚠️ Values containing `: ` (colon + space) or starting with `#` **must be quoted**, or YAML parses them as a map / comment.
+
+### Preview and deploy base
 
 ```bash
-kubectl -n student-dev get rs                    # note the ReplicaSet
-# edit overlays/dev/kustomization.yaml → LOG_LEVEL=trace
+kubectl kustomize base                 # or: kustomize build base
+kubectl create namespace base
+kubectl apply -k base -n base
+kubectl get all -n base
+```
+
+🌐 Open **http://&lt;node-ip&gt;:30080** → slate page, every row badged **from base**.
+
+---
+
+## 🔵 Step 2 — DEV overlay
+
+### `overlays/dev/kustomization.yaml`
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: dev
+namePrefix: dev-
+
+labels:
+  - pairs:
+      environment: development
+      owner: devops
+    includeSelectors: false
+    includeTemplates: true
+
+commonAnnotations:
+  kustomize.demo/layer: dev-overlay
+  createdBy: Ashutosh
+
+replicas:
+  - name: student-app
+    count: 1
+
+configMapGenerator:
+  - name: student-config
+    behavior: merge                    # change 2 keys, keep the rest from base
+    literals:
+      - "APP_COLOR=#3b82f6"
+      - "APP_MESSAGE=DEV overlay: namespace dev, prefix dev-, 1 replica, NodePort 30081."
+
+patches:
+  - target:
+      kind: Service
+      name: student-service
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: 30081
+```
+
+```bash
+kubectl kustomize overlays/dev         # preview
+kubectl create namespace dev
 kubectl apply -k overlays/dev
-kubectl -n student-dev get rs                    # a NEW ReplicaSet appeared
-kubectl -n student-dev get cm                    # old + new ConfigMap side by side
+kubectl get all -n dev
+kubectl describe deployment dev-student-app -n dev
 ```
 
-> **Teaching note:** the old ConfigMap is left behind. Clean up with `kubectl apply -k ... --prune -l app.kubernetes.io/part-of=kustomize-demo` or let your GitOps tool (Argo CD / Flux) prune it.
+**Observe**
 
-**Secrets:** base generates placeholders; dev replaces them with literals; prod reads `secrets.env`.
-
-```bash
-kubectl -n student-dev get secret -o name
-kubectl -n student-dev get secret <name> -o jsonpath='{.data.DB_USER}' | base64 -d; echo
-```
-
-> **Security note:** generated Secrets are only base64-encoded. Real projects use Sealed Secrets, SOPS (KSOPS plugin) or External Secrets Operator. Never commit `secrets.env` — it's in `.gitignore`.
-
----
-
-## Module 5 — Staging: suffix, image mirror, first component (15 min)
-
-```bash
-cat overlays/staging/kustomization.yaml
-kubectl kustomize overlays/staging | grep -E '^  name:|image:'
-```
-
-**Observe:**
-
-- `nameSuffix: -v2` → `stg-student-app-v2`. Note the hash still goes **after** the suffix: `stg-student-config-v2-<hash>`.
-- `images.newName` swaps the registry (`public.ecr.aws/nginx/nginx`) — common for air-gapped clusters or internal mirrors.
-- `components: [../../components/hpa]` adds an HPA, and its `scaleTargetRef` was renamed to `stg-student-app-v2` automatically. Kustomize knows which fields hold names of other objects.
-
-```bash
-kubectl apply -k overlays/staging
-kubectl -n student-staging get hpa
-```
-
-> **Teaching note:** HPA needs metrics-server to show CPU %. On kind: `kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml` then patch it with `--kubelet-insecure-tls`. Without it the HPA shows `<unknown>` — that's fine for this lab.
-
----
-
-## Module 6 — Components vs bases (10 min)
-
-| | Base (`resources:`) | Component (`components:`) |
+| | Base | Dev |
 |---|---|---|
-| `kind` | `Kustomization` | `Component` |
-| Purpose | The thing you deploy | An optional feature you mix in |
-| Can patch the parent? | No | **Yes** (see `components/monitoring`) |
-| Typical examples | app, database | HPA, PDB, monitoring, TLS, debug sidecar |
+| Deployment | `student-app` | `dev-student-app` |
+| ConfigMap | `student-config-<hash>` | `dev-student-config-<new hash>` |
+| Namespace | `base` | `dev` |
+| NodePort | 30080 | **30081** |
 
-Without components you'd copy the HPA into every overlay that needs it, or build a "base-with-hpa" — both drift over time.
+🌐 Open **http://&lt;node-ip&gt;:30081** → blue page. Course, trainer, image and limits stay **from base**.
 
-**Exercise:** add monitoring to dev by adding one line, then build:
+---
+
+## 🟢 Step 3 — PROD overlay
+
+### `overlays/prod/kustomization.yaml`
 
 ```yaml
-components:
-  - ../../components/monitoring
-```
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 
----
+resources:
+  - ../../base
 
-## Module 7 — Prod: the three patch styles (20 min)
+namespace: prod
+namePrefix: prod-
 
-```bash
-cat overlays/prod/kustomization.yaml
-kubectl kustomize overlays/prod > /tmp/prod.yaml
-```
+labels:
+  - pairs:
+      environment: production
+      owner: devops
+    includeSelectors: false
+    includeTemplates: true
 
-| Style | File | Best for | Look for in output |
-|---|---|---|---|
-| **Strategic merge** | `patches/resources.yaml` | Changing nested fields; lists merge by key (containers by `name`) | Higher CPU/memory, `RollingUpdate` with `maxUnavailable: 0` |
-| **JSON 6902** | `patches/add-env.json6902.yaml` | Exact operations: add/remove/replace a path | `FEATURE_FLAGS` env, `terminationGracePeriodSeconds: 45` |
-| **Inline + target** | inside `kustomization.yaml` | Small one-off changes, or one patch for many matching objects | Service `type: NodePort` |
+commonAnnotations:
+  kustomize.demo/layer: prod-overlay
+  createdBy: Ashutosh
 
-```bash
-grep -A3 'resources:' /tmp/prod.yaml
-grep -A2 FEATURE_FLAGS /tmp/prod.yaml
-grep 'type:' /tmp/prod.yaml
-```
+replicas:
+  - name: student-app
+    count: 3
 
-> **Common mistake (from the old practical):** naming the patch target `prod-student-app`. Patches match the **pre-prefix** name, so use `student-app`.
-
-> **Teaching note — `target` selectors** can match many objects at once, e.g. every Deployment with a label:
-> ```yaml
-> - target: { kind: Deployment, labelSelector: "app=student" }
->   patch: ...
-> ```
-
----
-
-## Module 8 — Deploy prod and compare environments (15 min)
-
-```bash
-kubectl diff -k overlays/prod
-kubectl apply -k overlays/prod
-kubectl -n student-prod get deploy,hpa,pdb,svc
-kubectl -n student-prod get deploy prod-student-app -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
-
-./scripts/compare-envs.sh dev prod | less
-```
-
-Open the red page: `make open ENV=prod`.
-
-> **Teaching note — replicas vs HPA:** prod sets `replicas: 3` but the HPA has `minReplicas: 2`. Once the HPA is active, it owns the replica count. In GitOps setups many teams remove `spec.replicas` from the Deployment when an HPA manages it, so every `apply` doesn't fight the autoscaler.
-
----
-
-## Module 9 — Labels, annotations and the selector trap (10 min)
-
-```bash
-kubectl get deploy -A -l app.kubernetes.io/part-of=kustomize-demo --show-labels
-kubectl -n student-prod get deploy prod-student-app -o jsonpath='{.metadata.annotations}'; echo
-```
-
-The rule used throughout this lab:
-
-| Where | Setting | Why |
-|---|---|---|
-| Base | `includeSelectors: true` | Stable identity labels, set once, go into selectors |
-| Overlays | `includeSelectors: false` | Environment labels change freely without touching selectors |
-
-**Why:** Deployment selectors are **immutable**. If an overlay adds a label to the selector and you later change it, `kubectl apply` fails with `field is immutable` and you must delete and recreate the Deployment. The old `commonLabels` field always wrote into selectors, which is why it's deprecated in favour of `labels`.
-
-**Demo the failure (optional):** in `overlays/dev` set `includeSelectors: true`, apply, change `owner: devops` to `owner: platform`, apply again → error. Revert.
-
----
-
-## Module 10 — CI checks and cleanup (10 min)
-
-```bash
-make validate                  # builds every overlay; add kubeconform for schema checks
-make build-all                 # writes rendered/<env>.yaml — what GitOps tools apply
-```
-
-A minimal CI job is just `./scripts/validate.sh`: if anyone breaks an overlay, the pipeline fails before it reaches a cluster.
-
-**Cleanup:**
-
-```bash
-make delete-all                # deletes each overlay, including its namespace
-kind delete cluster --name kustomize-lab
-```
-
----
-
-## Hands-on exercises
-
-<details><summary><b>1.</b> Add <code>qa</code> environment: namespace <code>student-qa</code>, prefix <code>qa-</code>, 2 replicas, purple page, PDB component.</summary>
-
-```bash
-cp -r overlays/dev overlays/qa
-# edit namespace.yaml → student-qa; kustomization.yaml → namespace, namePrefix, replicas, labels, APP_ENV
-# add: components: [../../components/pdb]
-# change the colour in overlays/qa/html/index.html
-kubectl kustomize overlays/qa
-```
-</details>
-
-<details><summary><b>2.</b> In prod, pin the image by digest instead of tag.</summary>
-
-```yaml
 images:
   - name: nginx
-    digest: sha256:<digest-from-registry>
-```
-Digests are immutable; tags can be re-pushed.
-</details>
+    newTag: 1.27-alpine
 
-<details><summary><b>3.</b> Remove the liveness probe in dev only, using a JSON 6902 patch.</summary>
-
-```yaml
-patches:
-  - target: { kind: Deployment, name: student-app }
-    patch: |-
-      - op: remove
-        path: /spec/template/spec/containers/0/livenessProbe
-```
-</details>
-
-<details><summary><b>4.</b> Load config from a file instead of literals.</summary>
-
-Create `overlays/dev/app.properties`, then:
-```yaml
 configMapGenerator:
   - name: student-config
     behavior: merge
-    envs: [app.properties]     # each KEY=VALUE line becomes a key
-```
-Use `files:` instead of `envs:` to store the whole file as one key.
-</details>
+    literals:
+      - "APP_COLOR=#22c55e"
+      - "APP_MESSAGE=PROD overlay: namespace prod, prefix prod-, 3 replicas, nginx 1.27, bigger limits, NodePort 30082."
 
-<details><summary><b>5.</b> Turn off the hash suffix for one ConfigMap. When would you want this?</summary>
-
-```yaml
-generatorOptions:
-  disableNameSuffixHash: true
-```
-Only when something outside Kustomize references the ConfigMap by a fixed name. You lose automatic rollouts on change.
-</details>
-
-<details><summary><b>6.</b> Create a <code>debug</code> component that adds a busybox sidecar and use it in dev.</summary>
-
-```yaml
-# components/debug/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1alpha1
-kind: Component
 patches:
-  - target: { kind: Deployment }
+  - path: resources-patch.yaml         # strategic-merge patch (file)
+  - target:                            # JSON6902 patch (inline)
+      kind: Service
+      name: student-service
     patch: |-
-      - op: add
-        path: /spec/template/spec/containers/-
-        value: { name: debug, image: busybox:1.36, command: ["sleep", "infinity"] }
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: 30082
+```
+
+### `overlays/prod/resources-patch.yaml`
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-app          # base name — matched before the prefix is added
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits:   { cpu: 250m, memory: 128Mi }
+```
+
+```bash
+kubectl kustomize overlays/prod
+kubectl create namespace prod
+kubectl apply -k overlays/prod
+kubectl get all -n prod
+kubectl get deployment prod-student-app -n prod -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
+🌐 Open **http://&lt;node-ip&gt;:30082** → green page, **9 of 12** rows badged **overlay**.
+Click **Send 20 requests** and watch 3 different pods answer — that's the `replicas: 3` overlay, live.
+
+---
+
+## 🌐 Step 4 — Open all three pages
+
+```bash
+# Node IP
+kubectl get nodes -o wide
+
+# minikube
+minikube ip
+minikube service dev-student-service -n dev --url    # handy if the node IP isn't reachable
+
+# All three NodePort services
+kubectl get svc -A | grep student-service
+```
+
+| URL | What you should see |
+|---|---|
+| `http://<node-ip>:30080` | ⚪ **Running as base** — 0 of 12 changed |
+| `http://<node-ip>:30081` | 🔵 **Running as development** — namespace, name, label, colour, port changed |
+| `http://<node-ip>:30082` | 🟢 **Running as production** — plus image, CPU/memory limits, 3 replicas |
+
+**Using kind?** Create the cluster with port mappings:
+
+```yaml
+# kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - { containerPort: 30080, hostPort: 30080 }
+      - { containerPort: 30081, hostPort: 30081 }
+      - { containerPort: 30082, hostPort: 30082 }
+```
+
+```bash
+kind create cluster --config kind-config.yaml
+# then open http://localhost:30080, :30081, :30082
+```
+
+**Terminal check without a browser**
+
+```bash
+NODE=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+for p in 30080 30081 30082; do echo "== $p"; curl -s http://$NODE:$p/info; echo; done
+```
+
+---
+
+## 🔍 Compare outputs side by side
+
+```bash
+diff <(kubectl kustomize base) <(kubectl kustomize overlays/dev)
+diff <(kubectl kustomize overlays/dev) <(kubectl kustomize overlays/prod)
+```
+
+---
+
+## 🧪 Feature reference
+
+<details>
+<summary><b>🖼️ Image override</b></summary>
+
+```yaml
+images:
+  - name: nginx            # image name as written in base
+    newTag: 1.27-alpine    # or newName: myregistry/nginx
+```
+Verify: `kubectl get deploy -n prod -o yaml | grep image:` — page shows nginx `1.27.x`.
+</details>
+
+<details>
+<summary><b>🗂️ ConfigMap generator</b></summary>
+
+Generated names get a content hash (`student-config-t8t2b89gt8`). Change a value → new hash →
+Deployment reference updated → **pods roll automatically**.
+`behavior: merge` in an overlay changes only the keys you list.
+
+```bash
+kubectl get configmap -n dev
+```
+</details>
+
+<details>
+<summary><b>🔐 Secret generator</b></summary>
+
+```yaml
+secretGenerator:
+  - name: student-secret
+    literals:
+      - username=admin
+      - password=Pass@123
+```
+```bash
+kubectl get secrets -n dev
+kubectl get secret -n dev -l environment=development -o jsonpath='{.items[0].data.username}' | base64 -d
+```
+> Demo only. Never commit real passwords — use Sealed Secrets, SOPS or External Secrets.
+</details>
+
+<details>
+<summary><b>🏷️ Labels (replacement for deprecated <code>commonLabels</code>)</b></summary>
+
+```yaml
+labels:
+  - pairs:
+      owner: devops
+      environment: development
+    includeSelectors: false   # don't touch selectors (they're immutable)
+    includeTemplates: true    # also label pods
+```
+`commonLabels` still works but also rewrites selectors, which breaks `apply` if you change a value later.
+
+```bash
+kubectl get deployment -n dev --show-labels
+```
+</details>
+
+<details>
+<summary><b>📝 Common annotations</b></summary>
+
+```yaml
+commonAnnotations:
+  createdBy: Ashutosh
+  training: kustomize
+```
+```bash
+kubectl describe deployment dev-student-app -n dev
+```
+</details>
+
+<details>
+<summary><b>🔤 namePrefix / nameSuffix</b></summary>
+
+```yaml
+namePrefix: dev-     # student-app → dev-student-app
+nameSuffix: -v1      # student-app → student-app-v1
+```
+Kustomize also rewrites every reference (ConfigMap, Secret, volume) to the new names.
+</details>
+
+<details>
+<summary><b>📦 Namespace without editing YAML</b></summary>
+
+```yaml
+namespace: prod
+```
+Every namespaced resource is placed in `prod`. Create the namespace first, or add a `Namespace` resource to the overlay.
+</details>
+
+<details>
+<summary><b>🩹 Patches — two styles</b></summary>
+
+**Strategic merge** (looks like the resource, only changed fields):
+```yaml
+patches:
+  - path: resources-patch.yaml
+```
+
+**JSON6902** (precise operations):
+```yaml
+patches:
+  - target: { kind: Service, name: student-service }
+    patch: |-
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: 30082
 ```
 </details>
 
 ---
 
-## Kustomize vs Helm
+## 🧹 Cleanup
 
-| | Kustomize | Helm |
-|---|---|---|
-| Approach | Patch plain YAML (overlay) | Template YAML with `{{ }}` values |
-| Learning curve | Low — it's just YAML | Higher — Go templates, functions |
-| Packaging / sharing | Git directories, remote bases | Charts in repositories, versioned |
-| Release tracking / rollback | None (use Git / GitOps) | Built in (`helm rollback`) |
-| Logic (if/loops) | None by design | Full templating logic |
-| Best for | Your own apps across environments | Distributing apps to many users |
-
-They combine well: `helmCharts:` in a kustomization (`kustomize build --enable-helm`), or patching a rendered Helm chart with a Kustomize overlay. Argo CD and Flux support both natively.
+```bash
+kubectl delete -k overlays/prod
+kubectl delete -k overlays/dev
+kubectl delete -k base -n base
+kubectl delete namespace base dev prod
+```
 
 ---
 
-## Interview questions — quick answers
+## 🛠️ Troubleshooting
 
-1. **What is Kustomize?** A template-free tool to customise Kubernetes YAML through layered overlays; built into `kubectl` (`-k`).
-2. **Base vs overlay?** Base = shared manifests; overlay = environment-specific changes referencing the base.
-3. **What is a component?** A reusable, opt-in bundle of resources/patches (`kind: Component`) that overlays include via `components:`.
-4. **namePrefix / nameSuffix?** Add text to every object name and update all references to them.
-5. **Why does a generated ConfigMap get a hash?** So a content change creates a new name, which changes the pod spec and triggers a rollout.
-6. **merge vs replace behaviour?** `merge` keeps base keys and overrides listed ones; `replace` discards base content.
-7. **How do you override images?** `images:` with `newName`, `newTag` or `digest`, matched by the image name in the base.
-8. **Strategic merge vs JSON 6902?** SMP is a partial object merged by keys; JSON 6902 is explicit operations on paths (good for removals and list indexes).
-9. **Why is `commonLabels` deprecated?** It always modified selectors, which are immutable; `labels` lets you choose with `includeSelectors`.
-10. **`kubectl kustomize` vs `kubectl apply -k`?** The first renders to stdout; the second renders and applies.
-11. **How do you preview changes?** `kubectl diff -k <dir>`.
-12. **How do you handle secrets safely?** Keep values out of Git (`.env` ignored), or use SOPS / Sealed Secrets / External Secrets.
-13. **Why must patches use the base name?** Patches are matched before name transformers run.
-14. **How do you remove stale generated ConfigMaps?** `apply --prune` with a label selector, or GitOps pruning.
-15. **Kustomize or Helm?** Kustomize for your own multi-environment apps; Helm for packaged, distributable, versioned releases.
+| Symptom | Fix |
+|---|---|
+| `cannot unmarshal object into ... literals` | Quote literals containing `: ` → `- "KEY=a: b"` |
+| `provided port is already allocated` | Another Service owns that NodePort. Check `kubectl get svc -A \| grep 3008` |
+| Page says *Couldn't reach /info* | Pod not ready: `kubectl get pods -n <ns>` and `kubectl logs -n <ns> deploy/<name>` |
+| Can't open the NodePort | minikube: use `minikube ip`; kind: add `extraPortMappings`; cloud: open firewall 30080-30082 |
+| Only 1 pod answers in prod | Wait for all 3 pods to be Ready; each request opens a new connection so kube-proxy can spread it |
 
 ---
 
-## What changed from the original practical
+## ⚡ Useful commands
 
-| Original | Upgraded | Why |
-|---|---|---|
-| `commonLabels` | `labels` with `includeSelectors` | `commonLabels` is deprecated and breaks immutable selectors |
-| `kubectl create namespace` by hand | `namespace.yaml` in each overlay | One command deploys everything; deletes clean up fully |
-| Plain-text password in base | Placeholder in base, `secrets.env` (git-ignored) in prod | Never commit credentials |
-| Requirement said `nginx:latest`, YAML used `1.25` | Pinned tag in prod; mirror registry in staging | Consistent, reproducible images |
-| Patch section replaced the whole prod overlay | All features coexist in one working prod overlay | Students see the full picture |
-| 2 environments | 3 environments + reusable components | Shows real reuse and opt-in features |
-| No visible output | Colour-coded page per environment | Immediate feedback in the browser |
-| No probes or resources | Probes, requests/limits, rollout strategy, HPA, PDB | Production-grade baseline |
-| No automation | Makefile, `validate.sh`, `compare-envs.sh` | Faster demos; CI-ready |
+```bash
+kubectl kustomize base               kustomize build base
+kubectl kustomize overlays/dev       kustomize build overlays/dev
+kubectl kustomize overlays/prod      kustomize build overlays/prod
+
+kubectl apply  -k base -n base       kubectl delete -k base -n base
+kubectl apply  -k overlays/dev       kubectl delete -k overlays/dev
+kubectl apply  -k overlays/prod      kubectl delete -k overlays/prod
+```
+
+---
+
+## 🎤 Interview questions (with short answers)
+
+<details><summary><b>1. What is Kustomize?</b></summary>A template-free way to customise Kubernetes YAML. Built into kubectl (<code>-k</code>).</details>
+<details><summary><b>2. Why use Kustomize?</b></summary>Keep one plain-YAML base and layer environment differences on top, without copying files or learning a template language.</details>
+<details><summary><b>3. Base vs Overlay?</b></summary>Base = shared, reusable manifests. Overlay = references the base and applies environment-specific changes.</details>
+<details><summary><b>4. Helm vs Kustomize?</b></summary>Helm: templating + packaging + releases/rollback, values files. Kustomize: patches over plain YAML, no templates, no release state. They're often combined.</details>
+<details><summary><b>5. namePrefix?</b></summary>Adds a prefix to resource names and updates all references.</details>
+<details><summary><b>6. nameSuffix?</b></summary>Adds a suffix to resource names and updates all references.</details>
+<details><summary><b>7. configMapGenerator?</b></summary>Generates a ConfigMap from literals/files/env files with a content hash so pods restart when config changes.</details>
+<details><summary><b>8. secretGenerator?</b></summary>Same as configMapGenerator but produces a Secret (base64, not encrypted).</details>
+<details><summary><b>9. Override images?</b></summary><code>images:</code> with <code>name</code> plus <code>newTag</code>, <code>newName</code> or <code>digest</code>.</details>
+<details><summary><b>10. Patch resources?</b></summary><code>patches:</code> with a strategic-merge file or a JSON6902 inline patch and a <code>target</code>.</details>
+<details><summary><b>11. kubectl apply -k?</b></summary>Builds the kustomization and applies the result in one step.</details>
+<details><summary><b>12. kubectl kustomize?</b></summary>Builds and prints the final YAML without applying — a dry run.</details>
+<details><summary><b>13. Manage multiple environments?</b></summary>One base, one overlay per environment (dev, staging, prod), each in its own namespace.</details>
+<details><summary><b>14. commonLabels?</b></summary>Adds labels everywhere including selectors. Deprecated in favour of <code>labels:</code> with <code>includeSelectors</code> control.</details>
+<details><summary><b>15. commonAnnotations?</b></summary>Adds annotations to all resources and pod templates.</details>
+
+---
+
+<div align="center">
+
+**Same `index.html`. Same `deployment.yaml`. Three different pages.**
+That's base + overlay. 🎉
+
+</div>

@@ -1,11 +1,11 @@
-# Base Deployment — the "shared truth" for every environment.
-# Overlays NEVER edit this file; they layer changes on top of it.
+# BASE Deployment — the single source of truth.
+# Overlays never edit this file; they transform it.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: student-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: student
@@ -16,41 +16,49 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: nginx:1.27-alpine
+          image: nginx:1.25-alpine          # prod overlay overrides the tag
           ports:
-            - name: http
-              containerPort: 80
-          # Plain config comes from the generated ConfigMap,
-          # credentials from the generated Secret.
-          # Kustomize rewrites these names to include the content hash.
+            - containerPort: 80
+          # Everything below is read by nginx and printed on the web page,
+          # so the page itself proves what each overlay changed.
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: POD_NAMESPACE           # changed by overlay `namespace:`
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: ENV_LABEL               # changed by overlay `labels:`
+              valueFrom: { fieldRef: { fieldPath: "metadata.labels['environment']" } }
+            - name: LAYER                   # changed by overlay `commonAnnotations:`
+              valueFrom: { fieldRef: { fieldPath: "metadata.annotations['kustomize.demo/layer']" } }
+            - name: CPU_LIMIT               # changed by prod patch
+              valueFrom: { resourceFieldRef: { resource: limits.cpu, divisor: 1m } }
+            - name: MEM_LIMIT               # changed by prod patch
+              valueFrom: { resourceFieldRef: { resource: limits.memory, divisor: 1Mi } }
+            - name: SECRET_USER             # from secretGenerator
+              valueFrom: { secretKeyRef: { name: student-secret, key: username } }
           envFrom:
             - configMapRef:
-                name: student-config
-            - secretRef:
-                name: student-secret
+                name: student-config        # from configMapGenerator (hash added)
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits:   { cpu: 100m, memory: 64Mi }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 80 }
+            initialDelaySeconds: 2
+            periodSeconds: 5
           volumeMounts:
             - name: html
               mountPath: /usr/share/nginx/html
-          resources:
-            requests:
-              cpu: 50m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 2
-            periodSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            - name: nginx-templates
+              mountPath: /etc/nginx/templates
       volumes:
         - name: html
           configMap:
-            name: student-html
+            name: student-html              # index.html (base) + overlay-note.html
+        - name: nginx-templates
+          configMap:
+            name: student-nginx-conf

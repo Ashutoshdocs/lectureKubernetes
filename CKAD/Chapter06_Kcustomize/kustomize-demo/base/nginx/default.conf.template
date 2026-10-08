@@ -1,0 +1,30 @@
+# nginx official image runs envsubst on /etc/nginx/templates/*.template at start.
+# Only variables that exist in the container env are replaced, so nginx's own
+# $variables (like $nginx_version) stay untouched.
+server {
+    listen 80;
+    server_name _;
+
+    # Close the connection after every response so each browser request
+    # opens a new one and kube-proxy can spread it across replicas.
+    keepalive_timeout 0;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Live facts about THIS pod, rendered by index.html.
+    location = /info {
+        default_type application/json;
+        add_header Cache-Control "no-store";
+        return 200 '{"pod":"${POD_NAME}","namespace":"${POD_NAMESPACE}","podIP":"${POD_IP}","node":"${NODE_NAME}","environment":"${ENV_LABEL}","layer":"${LAYER}","nginxVersion":"$nginx_version","cpuLimit":"${CPU_LIMIT}m","memLimit":"${MEM_LIMIT}Mi","course":"${APP_COURSE}","trainer":"${APP_TRAINER}","message":"${APP_MESSAGE}","color":"${APP_COLOR}","secretUser":"${SECRET_USER}"}';
+    }
+
+    location / {
+        root  /usr/share/nginx/html;
+        index index.html;
+        add_header Cache-Control "no-store";
+    }
+}

@@ -1,17 +1,10 @@
-# PROD overlay — every Kustomize feature in one place.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
   - ../../base
-  - namespace.yaml
 
-components:
-  - ../../components/hpa
-  - ../../components/pdb
-  - ../../components/monitoring
-
-namespace: student-prod
+namespace: prod
 namePrefix: prod-
 
 labels:
@@ -22,55 +15,33 @@ labels:
     includeTemplates: true
 
 commonAnnotations:
+  kustomize.demo/layer: prod-overlay
   createdBy: Ashutosh
-  training: kustomize
-  change-ticket: CHG-1024
-
-# Pin an exact version in prod (never :latest).
-images:
-  - name: nginx
-    newTag: 1.27.3-alpine
 
 replicas:
   - name: student-app
     count: 3
 
+# Image override: base uses nginx:1.25-alpine, prod gets 1.27-alpine.
+images:
+  - name: nginx
+    newTag: 1.27-alpine
+
 configMapGenerator:
   - name: student-config
     behavior: merge
     literals:
-      - APP_ENV=production
-      - LOG_LEVEL=warn
-  - name: student-html
-    behavior: replace
-    files:
-      - index.html=html/index.html
-
-# Real credentials come from a .env file that is git-ignored.
-# Copy secrets.env.example -> secrets.env before building.
-secretGenerator:
-  - name: student-secret
-    behavior: replace
-    envs:
-      - secrets.env
+      - "APP_COLOR=#22c55e"
+      - "APP_MESSAGE=PROD overlay: namespace prod, prefix prod-, 3 replicas, nginx 1.27, bigger limits, NodePort 30082."
 
 patches:
-  # (a) Strategic merge patch: a partial YAML object, merged by name.
-  - path: patches/resources.yaml
-
-  # (b) JSON 6902 patch: precise operations on a path.
-  - path: patches/add-env.json6902.yaml
-    target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: student-app
-
-  # (c) Inline patch with a target selector — change the Service type.
+  # Strategic-merge patch from a file: bigger CPU/memory limits.
+  - path: resources-patch.yaml
+  # JSON6902 inline patch: prod NodePort.
   - target:
       kind: Service
       name: student-service
     patch: |-
       - op: replace
-        path: /spec/type
-        value: NodePort
+        path: /spec/ports/0/nodePort
+        value: 30082
