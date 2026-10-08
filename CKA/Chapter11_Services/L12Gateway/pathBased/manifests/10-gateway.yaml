@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+# One Gateway, one public IP, ONE hostname listener:
+#   akblazeacademy.net  (port 80)
+#
+# Unlike host-based routing, there is only one listener here. The split into
+# /app1 and /app2 happens in the HTTPRoute (40-httproute.yaml) by URL path.
+#
+# The GatewayClass "nginx" is created by the NGINX Gateway Fabric install
+# (see README). If you use a different implementation (Istio, Envoy Gateway,
+# Azure Application Gateway for Containers, etc.) change gatewayClassName below.
+# ---------------------------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: akblaze-gateway
+  namespace: webapps
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "akblazeacademy.net"
+      allowedRoutes:
+        namespaces:
+          from: Same

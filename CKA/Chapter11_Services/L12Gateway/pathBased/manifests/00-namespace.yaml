@@ -1,0 +1,9 @@
+# ---------------------------------------------------------------------------
+# Namespace that holds the landing page, both apps and the shared Gateway.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: webapps
+  labels:
+    app.kubernetes.io/part-of: gateway-path-demo
