@@ -1,0 +1,655 @@
+================================================================================
+                    KUSTOMIZE END-TO-END PRACTICAL
+================================================================================
+
+OBJECTIVE
+================================================================================
+
+Learn Kustomize by deploying the SAME application into multiple environments
+(DEV and PROD) without modifying the original YAML files.
+
+Kustomize is built into kubectl and allows you to customize Kubernetes
+manifests using overlays.
+
+Benefits:
+- Reuse YAML files
+- Change replica counts
+- Change images
+- Add namespaces
+- Add labels
+- Add annotations
+- Generate ConfigMaps
+- Generate Secrets
+- Apply patches
+
+================================================================================
+INSTALLATION CHECK
+================================================================================
+
+kubectl version --client
+
+kubectl kustomize --help
+
+OR
+
+kustomize version
+
+================================================================================
+PROJECT STRUCTURE
+================================================================================
+
+kustomize-demo/
+
+├── base
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── kustomization.yaml
+│
+└── overlays
+    ├── dev
+    │   └── kustomization.yaml
+    │
+    └── prod
+        └── kustomization.yaml
+
+================================================================================
+STEP 1 - CREATE DIRECTORY STRUCTURE
+================================================================================
+
+mkdir -p kustomize-demo/base
+mkdir -p kustomize-demo/overlays/dev
+mkdir -p kustomize-demo/overlays/prod
+
+cd kustomize-demo
+
+tree
+
+================================================================================
+STEP 2 - CREATE BASE DEPLOYMENT
+================================================================================
+
+File:
+base/deployment.yaml
+
+--------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: student-app
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: student
+
+  template:
+    metadata:
+      labels:
+        app: student
+
+    spec:
+      containers:
+
+      - name: nginx
+
+        image: nginx
+
+        ports:
+        - containerPort: 80
+
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 3 - CREATE BASE SERVICE
+================================================================================
+
+File:
+base/service.yaml
+
+--------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: student-service
+
+spec:
+
+  selector:
+    app: student
+
+  ports:
+  - port: 80
+    targetPort: 80
+
+  type: NodePort
+
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 4 - CREATE BASE KUSTOMIZATION
+================================================================================
+
+File:
+base/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+resources:
+
+- deployment.yaml
+
+- service.yaml
+
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 5 - VERIFY BASE
+================================================================================
+
+kubectl kustomize base
+
+OR
+
+kustomize build base
+
+================================================================================
+STEP 6 - CREATE DEV OVERLAY
+================================================================================
+
+File:
+overlays/dev/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+resources:
+
+- ../../base
+
+namespace: dev
+
+namePrefix: dev-
+
+commonLabels:
+
+  environment: development
+
+replicas:
+
+- name: student-app
+  count: 1
+
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 7 - CREATE DEV NAMESPACE
+================================================================================
+
+kubectl create namespace dev
+
+================================================================================
+STEP 8 - PREVIEW DEV OUTPUT
+================================================================================
+
+kubectl kustomize overlays/dev
+
+OR
+
+kustomize build overlays/dev
+
+Observe:
+
+Deployment Name:
+dev-student-app
+
+Namespace:
+dev
+
+Replica Count:
+1
+
+================================================================================
+STEP 9 - DEPLOY DEV ENVIRONMENT
+================================================================================
+
+kubectl apply -k overlays/dev
+
+================================================================================
+STEP 10 - VERIFY DEV ENVIRONMENT
+================================================================================
+
+kubectl get all -n dev
+
+kubectl get deployment -n dev
+
+kubectl describe deployment dev-student-app -n dev
+
+================================================================================
+STEP 11 - CREATE PROD OVERLAY
+================================================================================
+
+File:
+overlays/prod/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+resources:
+
+- ../../base
+
+namespace: prod
+
+namePrefix: prod-
+
+commonLabels:
+
+  environment: production
+
+replicas:
+
+- name: student-app
+  count: 5
+
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 12 - CREATE PROD NAMESPACE
+================================================================================
+
+kubectl create namespace prod
+
+================================================================================
+STEP 13 - PREVIEW PROD OUTPUT
+================================================================================
+
+kubectl kustomize overlays/prod
+
+Observe:
+
+Deployment Name:
+prod-student-app
+
+Namespace:
+prod
+
+Replica Count:
+5
+
+================================================================================
+STEP 14 - DEPLOY PROD ENVIRONMENT
+================================================================================
+
+kubectl apply -k overlays/prod
+
+================================================================================
+STEP 15 - VERIFY PROD ENVIRONMENT
+================================================================================
+
+kubectl get all -n prod
+
+kubectl get deployment -n prod
+
+================================================================================
+IMAGE OVERRIDE PRACTICAL
+================================================================================
+
+Requirement:
+
+DEV  = nginx
+PROD = nginx:latest
+
+Edit:
+
+overlays/prod/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+resources:
+
+- ../../base
+
+namespace: prod
+
+images:
+
+- name: nginx
+  newTag: "1.25"
+
+--------------------------------------------------------------------------------
+
+Verify:
+
+kubectl kustomize overlays/prod
+
+Deploy:
+
+kubectl apply -k overlays/prod
+
+Verify:
+
+kubectl get deployment -n prod -o yaml
+
+================================================================================
+CONFIGMAP GENERATOR PRACTICAL
+================================================================================
+
+Edit:
+
+base/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+resources:
+
+- deployment.yaml
+
+- service.yaml
+
+configMapGenerator:
+
+- name: student-config
+
+  literals:
+
+  - course=DevOps
+
+  - trainer=Ashutosh
+
+--------------------------------------------------------------------------------
+
+Deploy:
+
+kubectl apply -k overlays/dev
+
+Verify:
+
+kubectl get configmap -n dev
+
+Observe:
+
+student-config-xxxxx
+
+Hash generated automatically.
+
+================================================================================
+SECRET GENERATOR PRACTICAL
+================================================================================
+
+Edit:
+
+base/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+secretGenerator:
+
+- name: student-secret
+
+  literals:
+
+  - username=admin
+
+  - password=Pass@123
+
+--------------------------------------------------------------------------------
+
+Deploy:
+
+kubectl apply -k overlays/dev
+
+Verify:
+
+kubectl get secrets -n dev
+
+================================================================================
+ADD COMMON LABELS
+================================================================================
+
+Edit:
+
+overlays/dev/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+commonLabels:
+
+  owner: devops
+
+  environment: development
+
+--------------------------------------------------------------------------------
+
+Verify:
+
+kubectl get deployment -n dev --show-labels
+
+================================================================================
+ADD COMMON ANNOTATIONS
+================================================================================
+
+Edit:
+
+overlays/dev/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+commonAnnotations:
+
+  createdBy: Ashutosh
+
+  training: kustomize
+
+--------------------------------------------------------------------------------
+
+Verify:
+
+kubectl describe deployment dev-student-app -n dev
+
+================================================================================
+NAME PREFIX PRACTICAL
+================================================================================
+
+namePrefix: dev-
+
+Result:
+
+student-app
+
+becomes
+
+dev-student-app
+
+================================================================================
+NAME SUFFIX PRACTICAL
+================================================================================
+
+nameSuffix: -v1
+
+Result:
+
+student-app
+
+becomes
+
+student-app-v1
+
+================================================================================
+CHANGE NAMESPACE WITHOUT EDITING YAML
+================================================================================
+
+namespace: production
+
+Deploy:
+
+kubectl apply -k overlays/prod
+
+Everything automatically deploys into production namespace.
+
+================================================================================
+PATCH PRACTICAL
+================================================================================
+
+Create:
+
+overlays/prod/replica-patch.yaml
+
+--------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: student-app
+
+spec:
+  replicas: 10
+
+--------------------------------------------------------------------------------
+
+Update:
+
+overlays/prod/kustomization.yaml
+
+--------------------------------------------------------------------------------
+
+resources:
+
+- ../../base
+
+patches:
+
+- path: replica-patch.yaml
+
+--------------------------------------------------------------------------------
+
+Preview:
+
+kubectl kustomize overlays/prod
+
+Deploy:
+
+kubectl apply -k overlays/prod
+
+Verify:
+
+kubectl get deployment -n prod
+
+================================================================================
+DELETE DEPLOYMENT
+================================================================================
+
+Delete DEV
+
+kubectl delete -k overlays/dev
+
+Delete PROD
+
+kubectl delete -k overlays/prod
+
+================================================================================
+USEFUL COMMANDS
+================================================================================
+
+kubectl kustomize base
+
+kubectl kustomize overlays/dev
+
+kubectl kustomize overlays/prod
+
+kubectl apply -k overlays/dev
+
+kubectl apply -k overlays/prod
+
+kubectl delete -k overlays/dev
+
+kubectl delete -k overlays/prod
+
+kustomize build base
+
+kustomize build overlays/dev
+
+kustomize build overlays/prod
+
+================================================================================
+INTERVIEW QUESTIONS
+================================================================================
+
+1. What is Kustomize?
+
+2. Why use Kustomize?
+
+3. Difference between Base and Overlay?
+
+4. Difference between Helm and Kustomize?
+
+5. What is namePrefix?
+
+6. What is nameSuffix?
+
+7. What is ConfigMapGenerator?
+
+8. What is SecretGenerator?
+
+9. How do you override images?
+
+10. How do you patch existing resources?
+
+11. What is kubectl apply -k?
+
+12. What is kubectl kustomize?
+
+13. How do you manage multiple environments?
+
+14. What are commonLabels?
+
+15. What are commonAnnotations?
+
+================================================================================
+KUSTOMIZE FLOW
+================================================================================
+
+BASE
+│
+├── Deployment
+├── Service
+│
+▼
+
+OVERLAY DEV
+│
+├── Namespace = dev
+├── Replica = 1
+├── Labels Added
+│
+▼
+
+Deploy
+
+------------------------------------------------------------
+
+BASE
+│
+├── Deployment
+├── Service
+│
+▼
+
+OVERLAY PROD
+│
+├── Namespace = prod
+├── Replica = 5
+├── Image Override
+├── Labels Added
+│
+▼
+
+Deploy
+
+================================================================================
+END OF PRACTICAL
+================================================================================
