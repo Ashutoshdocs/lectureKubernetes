@@ -1,0 +1,6 @@
+# Shipping the Namespace with the overlay means `kubectl apply -k`
+# creates it — no separate `kubectl create namespace` step.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: student-dev

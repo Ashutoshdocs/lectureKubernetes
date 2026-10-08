@@ -1,0 +1,11 @@
+# JSON 6902 patch: list of operations (add / replace / remove / copy / move / test).
+# Paths use list indexes: containers/0 = first container.
+# (Tip: "/env/-" would append to an EXISTING env list.)
+- op: add
+  path: /spec/template/spec/containers/0/env
+  value:
+    - name: FEATURE_FLAGS
+      value: "new-dashboard,fast-search"
+- op: add
+  path: /spec/template/spec/terminationGracePeriodSeconds
+  value: 45

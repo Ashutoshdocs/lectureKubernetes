@@ -1,0 +1,47 @@
+# DEV overlay — small, cheap, verbose.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+namespace: student-dev
+namePrefix: dev-
+
+# includeSelectors: false -> label metadata + pod templates, but NOT selectors.
+# Safe to add/change in overlays at any time.
+labels:
+  - pairs:
+      environment: development
+      owner: devops
+    includeSelectors: false
+    includeTemplates: true
+
+commonAnnotations:
+  createdBy: Ashutosh
+  training: kustomize
+
+replicas:
+  - name: student-app   # use the BASE name, not dev-student-app
+    count: 1
+
+# behavior: merge  -> keep base keys, override/add the ones listed here
+# behavior: replace -> throw away base content, use only this
+configMapGenerator:
+  - name: student-config
+    behavior: merge
+    literals:
+      - APP_ENV=dev
+      - LOG_LEVEL=debug
+  - name: student-html
+    behavior: replace
+    files:
+      - index.html=html/index.html
+
+secretGenerator:
+  - name: student-secret
+    behavior: replace
+    literals:
+      - DB_USER=dev_user
+      - DB_PASSWORD=dev_password

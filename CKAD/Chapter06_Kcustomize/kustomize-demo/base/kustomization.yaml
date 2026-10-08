@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 1. The raw manifests this base owns
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# 2. Labels added to every object.
+#    `labels` replaces the deprecated `commonLabels`.
+#    includeSelectors: true  -> also added to selectors (Deployment, Service, PDB...)
+#    Only do this in the BASE: selectors are immutable once deployed.
+labels:
+  - pairs:
+      app.kubernetes.io/name: student-app
+      app.kubernetes.io/part-of: kustomize-demo
+    includeSelectors: true
+
+# 3. Generated ConfigMaps. Kustomize appends a content hash to the name
+#    (student-config-abc123) and updates every reference to it.
+#    Change a value -> new hash -> Deployment rolls automatically.
+configMapGenerator:
+  - name: student-config
+    literals:
+      - COURSE=DevOps
+      - TRAINER=Ashutosh
+      - APP_ENV=base
+      - LOG_LEVEL=info
+  - name: student-html
+    files:
+      - index.html=html/index.html
+
+# 4. Generated Secret with safe placeholder values.
+#    Overlays replace these (prod reads them from a .env file).
+secretGenerator:
+  - name: student-secret
+    literals:
+      - DB_USER=placeholder
+      - DB_PASSWORD=placeholder

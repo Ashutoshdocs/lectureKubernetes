@@ -1,0 +1,3 @@
+# Never commit real secrets
+overlays/*/secrets.env
+rendered/

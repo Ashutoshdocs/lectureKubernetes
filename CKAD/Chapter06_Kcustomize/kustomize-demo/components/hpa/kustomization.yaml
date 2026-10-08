@@ -1,0 +1,7 @@
+# A Component is a reusable, opt-in feature.
+# Overlays switch it on with:   components: [../../components/hpa]
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - hpa.yaml

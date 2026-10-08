@@ -1,0 +1,20 @@
+# Kustomize knows scaleTargetRef points at a Deployment, so when an overlay
+# adds namePrefix "prod-", this target is renamed to "prod-student-app" too.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: student-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: student-app
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
