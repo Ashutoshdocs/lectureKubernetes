@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: two-nginx-pod
+  labels:
+    app: two-nginx
+spec:
+  volumes:
+    - name: shared-css          # emptyDir shared by both containers
+      emptyDir: {}
+
+  containers:
+    # ---------- Container 1 : nginx on port 80 ----------
+    - name: nginx-one
+      image: nginx:latest
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-css
+          mountPath: /usr/share/nginx/html/css
+
+    # ---------- Container 2 : nginx on port 8080 ----------
+    # Both containers share the pod's network, so they cannot both use port 80.
+    # We change container 2's listen port to 8080 before starting nginx.
+    - name: nginx-two
+      image: nginx:latest
+      command: ["/bin/sh", "-c"]
+      args:
+        - sed -i 's/80;/8080;/g' /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'
+      ports:
+        - containerPort: 8080
+      volumeMounts:
+        - name: shared-css
+          mountPath: /usr/share/nginx/html/css
