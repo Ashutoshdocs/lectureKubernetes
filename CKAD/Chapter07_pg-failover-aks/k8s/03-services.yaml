@@ -1,0 +1,43 @@
+# pg-headless : stable DNS for the StatefulSet pods (pg-a-0.pg-headless, pg-b-0.pg-headless)
+# pg-primary  : the ONLY address the frontend writes to. Failover = repoint its selector.
+# pg-replica  : read-only address the frontend reads from.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pg-headless
+  namespace: pg-demo
+spec:
+  clusterIP: None
+  selector:
+    app: pg
+  ports:
+    - name: postgres
+      port: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pg-primary
+  namespace: pg-demo
+spec:
+  selector:
+    app: pg
+    instance: pg-a
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pg-replica
+  namespace: pg-demo
+spec:
+  selector:
+    app: pg
+    instance: pg-b
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

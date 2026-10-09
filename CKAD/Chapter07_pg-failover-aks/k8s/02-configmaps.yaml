@@ -1,0 +1,86 @@
+# pg-cluster  : the single source of truth for "who is primary".
+#               Read by each DB pod at startup to decide primary vs replica.
+# pg-scripts  : start.sh  -> runs before Postgres; clones a replica or starts a primary
+#               01-init.sh -> runs ONCE on the first primary's empty disk (initdb hook)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-cluster
+  namespace: pg-demo
+data:
+  PRIMARY_INSTANCE: "pg-a"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-scripts
+  namespace: pg-demo
+data:
+  start.sh: |
+    #!/bin/bash
+    # Decides this pod's role and prepares PGDATA, then hands over to the
+    # official postgres entrypoint.
+    set -euo pipefail
+
+    ME="$HOSTNAME"                     # pg-a-0 or pg-b-0
+    MY_INSTANCE="${ME%-0}"             # pg-a or pg-b
+    PRIMARY_INSTANCE="${PRIMARY_INSTANCE:?PRIMARY_INSTANCE not set}"
+    log() { echo "[start.sh $(date +%T)] $*"; }
+
+    mkdir -p "$PGDATA"
+    chown postgres:postgres "$PGDATA"
+    chmod 700 "$PGDATA"
+
+    if [ "$MY_INSTANCE" = "$PRIMARY_INSTANCE" ]; then
+      log "ROLE = PRIMARY (ConfigMap pg-cluster says PRIMARY_INSTANCE=$PRIMARY_INSTANCE)"
+      if [ -f "$PGDATA/standby.signal" ]; then
+        log "NOTE: standby.signal exists -> still running as a replica until you run SELECT pg_promote();"
+      fi
+    else
+      log "ROLE = REPLICA of $PRIMARY_INSTANCE"
+      if [ -s "$PGDATA/PG_VERSION" ] && [ ! -f "$PGDATA/standby.signal" ]; then
+        log "Found data from a FORMER PRIMARY (no standby.signal). It may have diverged."
+        log "Wiping the disk and re-cloning from the current primary."
+        rm -rf "${PGDATA:?}"/*
+      fi
+      if [ ! -s "$PGDATA/PG_VERSION" ]; then
+        until pg_isready -h pg-primary -p 5432 -U replicator -d postgres -q; do
+          log "waiting for service pg-primary to accept connections..."
+          sleep 3
+        done
+        log "Cloning with pg_basebackup from pg-primary ..."
+        gosu postgres pg_basebackup \
+          -d "host=pg-primary port=5432 user=replicator password=${REPLICATION_PASSWORD} application_name=${ME}" \
+          -D "$PGDATA" -R -X stream --checkpoint=fast -P
+        log "Clone complete. standby.signal + primary_conninfo written by -R."
+      else
+        log "Existing replica data found, starting as standby."
+      fi
+    fi
+
+    exec docker-entrypoint.sh postgres \
+      -c cluster_name="$ME" \
+      -c listen_addresses='*' \
+      -c wal_level=replica \
+      -c max_wal_senders=10 \
+      -c wal_keep_size=256MB \
+      -c hot_standby=on \
+      -c wal_log_hints=on
+
+  01-init.sh: |
+    #!/bin/bash
+    # Runs only once, when the very first primary initialises an empty disk.
+    set -e
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<EOSQL
+    CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '${REPLICATION_PASSWORD}';
+    CREATE TABLE messages (
+      id           serial PRIMARY KEY,
+      body         text NOT NULL,
+      written_on   text NOT NULL DEFAULT current_setting('cluster_name'),
+      frontend_pod text,
+      created_at   timestamptz NOT NULL DEFAULT now()
+    );
+    EOSQL
+    # Allow streaming replication connections. Replicas copy this file with
+    # pg_basebackup, so a promoted replica also accepts replicas.
+    echo "host replication replicator all scram-sha-256" >> "$PGDATA/pg_hba.conf"

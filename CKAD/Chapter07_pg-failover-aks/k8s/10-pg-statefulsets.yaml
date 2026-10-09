@@ -1,0 +1,175 @@
+# Two single-replica StatefulSets (pg-a, pg-b) instead of one with replicas: 2,
+# so each DB instance can be fenced/scaled on its own during failover.
+#
+# Storage: each gets its OWN Azure Managed Disk via volumeClaimTemplates
+#   storageClassName: managed-csi   accessModes: ReadWriteOnce
+# A disk can attach to only one node at a time -> perfect for a database.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pg-a
+  namespace: pg-demo
+spec:
+  serviceName: pg-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pg
+      instance: pg-a
+  template:
+    metadata:
+      labels:
+        app: pg
+        instance: pg-a
+    spec:
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:            # keep pg-a and pg-b on different nodes
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: pg
+      containers:
+        - name: postgres
+          image: postgres:16
+          command: ["bash", "/scripts/start.sh"]
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata   # subdir avoids lost+found on the disk root
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: appdb
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: pg-secret, key: POSTGRES_PASSWORD}
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: pg-secret, key: REPLICATION_PASSWORD}
+            - name: PRIMARY_INSTANCE              # read once, at pod creation
+              valueFrom:
+                configMapKeyRef: {name: pg-cluster, key: PRIMARY_INSTANCE}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-h", "127.0.0.1", "-p", "5432"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: scripts
+              mountPath: /scripts
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: scripts
+          configMap:
+            name: pg-scripts
+            items: [{key: start.sh, path: start.sh}]
+            defaultMode: 0755
+        - name: initdb
+          configMap:
+            name: pg-scripts
+            items: [{key: 01-init.sh, path: 01-init.sh}]
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: managed-csi
+        resources:
+          requests:
+            storage: 8Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pg-b
+  namespace: pg-demo
+spec:
+  serviceName: pg-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pg
+      instance: pg-b
+  template:
+    metadata:
+      labels:
+        app: pg
+        instance: pg-b
+    spec:
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:            # keep pg-a and pg-b on different nodes
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: pg
+      containers:
+        - name: postgres
+          image: postgres:16
+          command: ["bash", "/scripts/start.sh"]
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata   # subdir avoids lost+found on the disk root
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: appdb
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: pg-secret, key: POSTGRES_PASSWORD}
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: pg-secret, key: REPLICATION_PASSWORD}
+            - name: PRIMARY_INSTANCE              # read once, at pod creation
+              valueFrom:
+                configMapKeyRef: {name: pg-cluster, key: PRIMARY_INSTANCE}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-h", "127.0.0.1", "-p", "5432"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: scripts
+              mountPath: /scripts
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: scripts
+          configMap:
+            name: pg-scripts
+            items: [{key: start.sh, path: start.sh}]
+            defaultMode: 0755
+        - name: initdb
+          configMap:
+            name: pg-scripts
+            items: [{key: 01-init.sh, path: 01-init.sh}]
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: managed-csi
+        resources:
+          requests:
+            storage: 8Gi

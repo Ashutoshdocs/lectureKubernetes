@@ -1,0 +1,297 @@
+# Frontend: 2 replicas, exposed by an Azure LoadBalancer.
+#   - WRITES go only to Service pg-primary
+#   - READS  come from Service pg-replica (falls back to primary if replica is down)
+#   - Both replicas append to ONE shared access log on an Azure Files volume
+#     (storageClassName: azurefile-csi, accessModes: ReadWriteMany) -> RWX demo
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-app
+  namespace: pg-demo
+data:
+  app.py: |
+    import os, socket, datetime
+    from collections import deque
+    from flask import Flask, request, jsonify, redirect, render_template_string
+    import psycopg
+
+    DB = os.environ.get("PGDATABASE", "appdb")
+    USER = os.environ.get("PGUSER", "postgres")
+    PASSWORD = os.environ["PGPASSWORD"]
+    PRIMARY_HOST = os.environ.get("PRIMARY_HOST", "pg-primary")
+    REPLICA_HOST = os.environ.get("REPLICA_HOST", "pg-replica")
+    SHARED_LOG = os.environ.get("SHARED_LOG", "/shared/access.log")
+    POD = socket.gethostname()
+
+    app = Flask(__name__)
+
+    def connect(host):
+        return psycopg.connect(host=host, dbname=DB, user=USER, password=PASSWORD,
+                               connect_timeout=3, autocommit=True, client_encoding="UTF8")
+
+    def short_error(e):
+        text = str(e).strip()
+        return text.splitlines()[0] if text else e.__class__.__name__
+
+    def shared_log(line):
+        try:
+            with open(SHARED_LOG, "a") as f:
+                f.write(f"{datetime.datetime.utcnow():%Y-%m-%dT%H:%M:%SZ} {POD} {line}\n")
+        except OSError:
+            pass
+
+    def shared_log_tail(n=10):
+        try:
+            with open(SHARED_LOG) as f:
+                return list(deque(f, maxlen=n))
+        except OSError as e:
+            return [f"(cannot read shared log: {e})"]
+
+    def node_status(host):
+        try:
+            with connect(host) as conn:
+                pod, recovery, rows, lag = conn.execute("""
+                    SELECT current_setting('cluster_name'),
+                           pg_is_in_recovery(),
+                           (SELECT count(*) FROM messages),
+                           CASE WHEN pg_is_in_recovery()
+                                THEN extract(epoch FROM now() - pg_last_xact_replay_timestamp())
+                           END
+                """).fetchone()
+                st = {"service": host, "up": True, "pod": pod,
+                      "role": "REPLICA (read-only)" if recovery else "PRIMARY (read-write)",
+                      "in_recovery": recovery, "rows": rows,
+                      "seconds_since_last_replayed_tx": round(float(lag), 1) if lag is not None else None}
+                if not recovery:
+                    st["streaming_replicas"] = [
+                        {"name": r[0], "state": r[1], "client": r[2]}
+                        for r in conn.execute(
+                            "SELECT application_name, state, client_addr::text FROM pg_stat_replication")
+                    ]
+                return st
+        except Exception as e:
+            return {"service": host, "up": False, "error": short_error(e)}
+
+    def read_messages(limit=15):
+        for host in (REPLICA_HOST, PRIMARY_HOST):
+            try:
+                with connect(host) as conn:
+                    rows = conn.execute(
+                        "SELECT id, body, written_on, frontend_pod, created_at "
+                        "FROM messages ORDER BY id DESC LIMIT %s", (limit,)).fetchall()
+                return host, rows, None
+            except Exception as e:
+                err = short_error(e)
+        return None, [], err
+
+    def do_write(body):
+        try:
+            with connect(PRIMARY_HOST) as conn:
+                r = conn.execute(
+                    "INSERT INTO messages (body, frontend_pod) VALUES (%s, %s) "
+                    "RETURNING id, written_on, created_at", (body, POD)).fetchone()
+            shared_log(f"WRITE ok id={r[0]} written_on={r[1]}")
+            return {"ok": True, "id": r[0], "written_on": r[1],
+                    "created_at": r[2].isoformat(), "frontend_pod": POD}, 200
+        except Exception as e:
+            shared_log(f"WRITE FAILED {short_error(e)}")
+            return {"ok": False, "error": short_error(e), "frontend_pod": POD}, 503
+
+    PAGE = """
+    <!doctype html><html><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% if auto %}<meta http-equiv="refresh" content="3">{% endif %}
+    <title>PG Failover Demo</title>
+    <style>
+     body{font-family:system-ui,sans-serif;margin:16px;max-width:1000px;background:#f6f7f9;color:#1d2330}
+     .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+     .card{background:#fff;border-radius:10px;padding:14px;border:1px solid #dde1e7}
+     .up{border-left:6px solid #2e9e5b}.down{border-left:6px solid #d64545}
+     .primary{color:#1a6dd6;font-weight:700}.replica{color:#7a4fc2;font-weight:700}
+     table{width:100%;border-collapse:collapse;background:#fff}td,th{padding:6px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+     .msg{padding:8px;border-radius:6px;margin:8px 0}.ok{background:#e3f5ea}.err{background:#fde8e8}
+     pre{background:#111;color:#cfe;padding:10px;border-radius:8px;overflow-x:auto;font-size:12px}
+     input[type=text]{padding:8px;width:60%}button{padding:8px 14px}
+    </style></head><body>
+    <h2>PostgreSQL primary/replica failover demo</h2>
+    <p>Served by frontend pod <b>{{ pod }}</b> ·
+       {% if auto %}<a href="/">stop auto-refresh</a>{% else %}<a href="/?auto=1">auto-refresh every 3s</a>{% endif %}</p>
+    {% if flash %}<div class="msg {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
+    <form method="post" action="/write">
+      <input type="text" name="body" placeholder="type a message, it is written to pg-primary" required>
+      <button>Write to primary</button>
+    </form>
+    <h3>Database services</h3>
+    <div class="cards">
+    {% for s in statuses %}
+      <div class="card {{ 'up' if s.up else 'down' }}">
+        <div>Service <code>{{ s.service }}</code></div>
+        {% if s.up %}
+          <div>Pod: <b>{{ s.pod }}</b></div>
+          <div class="{{ 'replica' if s.in_recovery else 'primary' }}">{{ s.role }}</div>
+          <div>Rows in messages: {{ s.rows }}</div>
+          {% if s.in_recovery %}<div>Seconds since last replayed tx: {{ s.seconds_since_last_replayed_tx }}</div>{% endif %}
+          {% if s.streaming_replicas is defined %}
+            <div>Streaming replicas:
+              {% for r in s.streaming_replicas %}<b>{{ r.name }}</b> ({{ r.state }}) {% else %}<i>none</i>{% endfor %}
+            </div>
+          {% endif %}
+        {% else %}
+          <div><b>DOWN</b></div><div style="font-size:13px">{{ s.error }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+    </div>
+    <h3>Latest messages {% if read_from %}(read from <code>{{ read_from }}</code>){% endif %}</h3>
+    {% if read_err %}<div class="msg err">{{ read_err }}</div>{% endif %}
+    <table><tr><th>id</th><th>body</th><th>written_on (DB pod)</th><th>frontend pod</th><th>created_at</th></tr>
+    {% for r in rows %}<tr><td>{{ r[0] }}</td><td>{{ r[1] }}</td><td><b>{{ r[2] }}</b></td><td>{{ r[3] }}</td><td>{{ r[4].strftime('%H:%M:%S') }}</td></tr>{% endfor %}
+    </table>
+    <h3>Shared access log (Azure Files, ReadWriteMany, written by every frontend pod)</h3>
+    <pre>{% for l in log %}{{ l }}{% endfor %}</pre>
+    </body></html>
+    """
+
+    @app.get("/")
+    def index():
+        shared_log("GET /")
+        read_from, rows, read_err = read_messages()
+        return render_template_string(
+            PAGE, pod=POD, auto=request.args.get("auto"),
+            flash=request.args.get("flash"), flash_ok=request.args.get("ok") == "1",
+            statuses=[node_status(PRIMARY_HOST), node_status(REPLICA_HOST)],
+            read_from=read_from, rows=rows, read_err=read_err, log=shared_log_tail())
+
+    @app.post("/write")
+    def write_form():
+        result, _ = do_write(request.form.get("body", "").strip() or "(empty)")
+        if result["ok"]:
+            msg = f"Wrote id {result['id']} on DB pod {result['written_on']}"
+        else:
+            msg = f"WRITE FAILED: {result['error']}"
+        from urllib.parse import urlencode
+        return redirect("/?" + urlencode({"flash": msg, "ok": "1" if result["ok"] else "0"}))
+
+    @app.post("/api/write")
+    def write_api():
+        data = request.get_json(silent=True) or {}
+        body = data.get("body") or request.form.get("body") or "api write"
+        result, code = do_write(body)
+        return jsonify(result), code
+
+    @app.get("/api/status")
+    def status_api():
+        return jsonify({"frontend_pod": POD,
+                        "primary_service": node_status(PRIMARY_HOST),
+                        "replica_service": node_status(REPLICA_HOST)})
+
+    @app.get("/api/messages")
+    def messages_api():
+        read_from, rows, err = read_messages(int(request.args.get("limit", 10)))
+        return jsonify({"read_from": read_from, "error": err, "messages": [
+            {"id": r[0], "body": r[1], "written_on": r[2], "frontend_pod": r[3],
+             "created_at": r[4].isoformat()} for r in rows]})
+
+    @app.get("/api/shared-log")
+    def shared_log_api():
+        return jsonify({"frontend_pod": POD, "lines": [l.rstrip() for l in shared_log_tail(20)]})
+
+    @app.get("/healthz")
+    def healthz():
+        return "ok"
+---
+# RWX volume on Azure Files: many pods on many nodes can mount it read-write at once.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: frontend-shared
+  namespace: pg-demo
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: azurefile-csi
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: pg-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      affinity:
+        podAntiAffinity:          # spread the 2 replicas over 2 nodes -> proves RWX across nodes
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: frontend
+      containers:
+        - name: web
+          image: python:3.12-slim
+          workingDir: /app
+          command: ["sh", "-c"]
+          args:
+            - pip install --no-cache-dir -q flask==3.0.3 "psycopg[binary]==3.2.3" gunicorn==23.0.0 &&
+              exec gunicorn -w 2 -b 0.0.0.0:8080 --access-logfile - app:app
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PRIMARY_HOST
+              value: pg-primary
+            - name: REPLICA_HOST
+              value: pg-replica
+            - name: PGDATABASE
+              value: appdb
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: {name: pg-secret, key: POSTGRES_PASSWORD}
+            - name: SHARED_LOG
+              value: /shared/access.log
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 256Mi}
+          volumeMounts:
+            - name: app
+              mountPath: /app
+            - name: shared
+              mountPath: /shared
+      volumes:
+        - name: app
+          configMap:
+            name: frontend-app
+        - name: shared
+          persistentVolumeClaim:
+            claimName: frontend-shared
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: pg-demo
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
