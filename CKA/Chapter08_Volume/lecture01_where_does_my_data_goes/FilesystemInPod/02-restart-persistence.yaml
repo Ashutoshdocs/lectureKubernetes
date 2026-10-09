@@ -1,0 +1,37 @@
+# Lab 3: what survives a container restart?
+#   /             -> overlay writable layer  (lost on container restart)
+#   /tmp          -> still the overlay       (lost on container restart)
+#   /data         -> emptyDir                (survives container restart, lost on pod delete)
+#
+# PID 1 traps SIGTERM and exits 1, so `kubectl exec restart-demo -- kill 1`
+# crashes the container and kubelet restarts it in the same pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restart-demo
+  labels:
+    lab: storage
+spec:
+  restartPolicy: Always
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "container started at $(date)"
+          trap 'echo "got TERM, exiting 1"; exit 1' TERM
+          while true; do sleep 1; done
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+  volumes:
+    - name: data
+      emptyDir: {}
