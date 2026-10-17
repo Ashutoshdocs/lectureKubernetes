@@ -1,0 +1,30 @@
+# SCENARIO 3 — pod-b: ingress ALLOWED, egress DENIED (same pod)
+#
+# Selects only pods labelled app=web in team-b (i.e. pod-b).
+# Both policy types are listed, so pod-b is isolated in BOTH directions,
+# then the ingress rule opens port 80 from namespace team-a.
+#
+# Tip: to allow ingress from ANYWHERE instead, replace the ingress block with:
+#   ingress:
+#     - {}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pod-b-ingress-allow-egress-deny
+  namespace: team-b
+spec:
+  podSelector:
+    matchLabels:
+      app: web
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: team-a   # auto-label on every namespace
+      ports:
+        - protocol: TCP
+          port: 80
+  egress: []      # empty list = no egress allowed at all

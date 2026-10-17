@@ -1,0 +1,16 @@
+# SCENARIO 2 — Default deny ALL EGRESS in team-a
+#
+# podSelector: {}       -> applies to EVERY pod in team-a
+# policyTypes: [Egress] -> this policy governs outgoing traffic
+# (no egress rules)     -> nothing is allowed out — including DNS (port 53)!
+#
+# Ingress to team-a pods is NOT affected (Ingress isn't listed).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: team-a
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress

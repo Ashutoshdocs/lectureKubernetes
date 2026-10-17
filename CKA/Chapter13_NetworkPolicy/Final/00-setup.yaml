@@ -1,0 +1,70 @@
+# Two namespaces, one nginx pod + Service in each.
+# Each pod writes "You hit <podname>" as its index page at startup
+# (hostname inside a pod == pod name).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-b
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-a
+  namespace: team-a
+  labels:
+    app: web
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27          # debian-based image, ships with curl
+      command: ["/bin/sh", "-c"]
+      args:
+        - echo "You hit $(hostname)" > /usr/share/nginx/html/index.html && exec nginx -g 'daemon off;'
+      ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: team-a
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-b
+  namespace: team-b
+  labels:
+    app: web
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      command: ["/bin/sh", "-c"]
+      args:
+        - echo "You hit $(hostname)" > /usr/share/nginx/html/index.html && exec nginx -g 'daemon off;'
+      ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: team-b
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80

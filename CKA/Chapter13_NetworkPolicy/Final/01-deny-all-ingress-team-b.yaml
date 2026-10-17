@@ -1,0 +1,16 @@
+# SCENARIO 1 — Default deny ALL INGRESS in team-b
+#
+# podSelector: {}        -> applies to EVERY pod in team-b
+# policyTypes: [Ingress] -> this policy governs incoming traffic
+# (no ingress rules)     -> nothing is allowed in
+#
+# Egress from team-b pods is NOT affected (Egress isn't listed).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: team-b
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
