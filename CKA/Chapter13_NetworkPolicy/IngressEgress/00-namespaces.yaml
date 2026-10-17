@@ -1,0 +1,11 @@
+# shop     -> the application we are protecting (frontend, backend, db)
+# outsider -> a "user/client" living in another namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shop
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: outsider

@@ -1,0 +1,26 @@
+# STAGE 4 - Give DNS back.
+# Without this, pods cannot resolve "backend.shop.svc.cluster.local",
+# so every connection by name fails before it even starts.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: shop
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        # namespaceSelector AND podSelector in ONE list item = both must match
+        # ("kube-dns pods that live in kube-system")
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

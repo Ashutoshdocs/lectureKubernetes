@@ -1,0 +1,49 @@
+# The "default" namespace already exists, so no Namespace object is needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-default
+  template:
+    metadata:
+      labels:
+        app: nginx-default
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SERVICE_DNS
+              value: nginx.default.svc.cluster.local
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "You successfully hit ${POD_NAME} under ${POD_NAMESPACE} and the DNS name of the service for the pod is ${SERVICE_DNS}" > /usr/share/nginx/html/index.html
+              exec nginx -g 'daemon off;'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  selector:
+    app: nginx-default
+  ports:
+    - port: 80
+      targetPort: 80

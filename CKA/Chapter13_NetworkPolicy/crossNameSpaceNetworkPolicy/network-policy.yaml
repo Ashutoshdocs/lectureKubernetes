@@ -1,0 +1,192 @@
+# Traffic rules:
+#   default -> pod1 : ALLOWED      default -> pod2/pod3 : DENIED
+#   pod1    -> pod2 : ALLOWED      pod1    -> pod3      : DENIED
+#   pod2    -> pod3 : ALLOWED (only destination)
+#   pod3    -> default : ALLOWED (only destination)
+# Every pod may also reach kube-dns (port 53) so service names resolve.
+# Requires a CNI that enforces NetworkPolicy (Calico, Cilium, Weave, etc.).
+
+# ---------------- ns-1 (pod1) ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-1-policy
+  namespace: ns-1
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx-1
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:                         # any pod in the default namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:                           # pod1 -> pod2 only
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ns-2
+          podSelector:
+            matchLabels:
+              app: nginx-2
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:                           # DNS
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ---------------- ns-2 (pod2) ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-2-policy
+  namespace: ns-2
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx-2
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:                         # only pod1 (default is denied)
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ns-1
+          podSelector:
+            matchLabels:
+              app: nginx-1
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:                           # pod2 -> pod3 only
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ns-3
+          podSelector:
+            matchLabels:
+              app: nginx-3
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ---------------- ns-3 (pod3) ----------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-3-policy
+  namespace: ns-3
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx-3
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:                         # only pod2 (default and pod1 denied)
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ns-2
+          podSelector:
+            matchLabels:
+              app: nginx-2
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:                           # pod3 -> default nginx only
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+          podSelector:
+            matchLabels:
+              app: nginx-default
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# ---------------- default (default nginx) ----------------
+# Scoped to the nginx-default pod only, so other workloads in "default" are untouched.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nginx-default-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx-default
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:        # pod3
+            matchLabels:
+              kubernetes.io/metadata.name: ns-3
+          podSelector:
+            matchLabels:
+              app: nginx-3
+        - namespaceSelector:        # pods in default (for testing)
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:                           # default nginx -> pod1 only
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ns-1
+          podSelector:
+            matchLabels:
+              app: nginx-1
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

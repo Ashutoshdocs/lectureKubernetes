@@ -1,0 +1,12 @@
+# STAGE 1 - Lock the front door.
+# podSelector: {} selects EVERY pod in "shop".
+# policyTypes: [Ingress] with no ingress rules = nothing may connect IN.
+# Egress (traffic going OUT) is untouched, so DNS and internet still work.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: shop
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]

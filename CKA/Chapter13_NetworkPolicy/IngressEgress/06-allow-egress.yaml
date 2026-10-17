@@ -1,0 +1,63 @@
+# STAGE 5 - Open only the outgoing paths we need (EGRESS allow-list).
+#   frontend -> backend
+#   backend  -> db
+#   backend  -> internet (ports 80/443, public IPs only)
+#   db       -> nothing (stays fully egress-denied)
+#
+# Remember: a connection works only if BOTH sides allow it:
+#   source pod's EGRESS  +  destination pod's INGRESS (from stage 2).
+
+# frontend may only talk to backend.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-egress-to-backend
+  namespace: shop
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# backend may talk to db, and to the public internet (e.g. a payment API).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-egress-to-db-and-internet
+  namespace: shop
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: db
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        # Any public IP. Private ranges are excluded so this rule cannot be
+        # used to reach other pods/nodes inside the cluster.
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+# db: intentionally no egress policy -> still denied by 04-default-deny-egress.

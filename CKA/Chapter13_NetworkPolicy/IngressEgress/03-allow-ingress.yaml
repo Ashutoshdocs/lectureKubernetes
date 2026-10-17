@@ -1,0 +1,66 @@
+# STAGE 2 - Open only the doors we need (INGRESS allow-list).
+#   outsider namespace -> frontend
+#   frontend           -> backend
+#   backend            -> db
+# Policies are additive: these ADD allowed sources on top of default-deny.
+
+# Anyone in the "outsider" namespace may reach frontend on port 80.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-allow-from-outsider
+  namespace: shop
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: outsider
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# Only frontend pods (same namespace, because there is no namespaceSelector)
+# may reach backend.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-from-frontend
+  namespace: shop
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# Only backend pods may reach db.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-from-backend
+  namespace: shop
+spec:
+  podSelector:
+    matchLabels:
+      app: db
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 80
