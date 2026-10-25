@@ -1,0 +1,28 @@
+# Basic emptyDir lesson: two containers in one pod share the same volume.
+# - "writer" appends a timestamp every 2s
+# - "reader" tails the same file
+# Delete the pod and the data is gone (emptyDir lives exactly as long as the pod).
+# A container restart does NOT wipe it, only pod deletion/rescheduling does.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emptydir-sharing
+  labels:
+    demo: emptydir
+spec:
+  containers:
+    - name: writer
+      image: alpine:3.20
+      command: ["sh", "-c", "while true; do date >> /shared/log.txt; sleep 2; done"]
+      volumeMounts:
+        - name: shared
+          mountPath: /shared
+    - name: reader
+      image: alpine:3.20
+      command: ["sh", "-c", "touch /shared/log.txt; tail -f /shared/log.txt"]
+      volumeMounts:
+        - name: shared
+          mountPath: /shared
+  volumes:
+    - name: shared
+      emptyDir: {}

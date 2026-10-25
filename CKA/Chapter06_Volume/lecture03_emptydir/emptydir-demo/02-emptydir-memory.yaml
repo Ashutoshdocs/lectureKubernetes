@@ -1,0 +1,29 @@
+# emptyDir backed by RAM (tmpfs)
+# medium: Memory  -> kubelet mounts a tmpfs. Files written here USE MEMORY
+# and are charged to the container's memory limit.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emptydir-memory
+  labels:
+    demo: emptydir
+spec:
+  containers:
+    - name: bench
+      image: alpine:3.20
+      command: ["sh", "-c", "sleep 3600"]
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "1Gi"       # must leave room for the files you put in tmpfs!
+          cpu: "1"
+      volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+  volumes:
+    - name: scratch
+      emptyDir:
+        medium: Memory
+        sizeLimit: 512Mi      # ALWAYS set this for Memory-backed emptyDir

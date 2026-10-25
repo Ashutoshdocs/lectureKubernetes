@@ -1,0 +1,34 @@
+# DANGER DEMO: RAM-backed emptyDir counts toward the container memory limit.
+# The container has a 200Mi limit and tries to write 300MB into tmpfs.
+# Expected result: the container is OOMKilled (or the pod is evicted for
+# exceeding sizeLimit). Watch with:  kubectl get pod emptydir-oom -w
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emptydir-oom
+  labels:
+    demo: emptydir
+spec:
+  restartPolicy: Never
+  containers:
+    - name: filler
+      image: alpine:3.20
+      command:
+        - sh
+        - -c
+        - |
+          echo "Writing 300MB into RAM-backed /scratch (limit is 200Mi)..."
+          dd if=/dev/zero of=/scratch/big bs=1M count=300
+          echo "If you see this, the write survived (check your cluster's memory accounting)."
+          sleep 600
+      resources:
+        limits:
+          memory: "200Mi"
+      volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+  volumes:
+    - name: scratch
+      emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi        # deliberately bigger than the memory limit
