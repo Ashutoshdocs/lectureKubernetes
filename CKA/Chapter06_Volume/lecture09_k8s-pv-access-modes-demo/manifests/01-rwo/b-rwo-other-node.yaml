@@ -1,0 +1,30 @@
+# DEMO 1b — try to use the RWO volume from the OTHER worker
+# ---------------------------------------------------------
+# podAntiAffinity forces this pod away from every node running rwo-writer,
+# i.e. onto the other worker. But the PV is pinned to the first worker.
+#
+# Expectation: Pending, with an event like
+#   0/3 nodes are available: 1 node(s) didn't match pod anti-affinity rules,
+#   1 node(s) had volume node affinity conflict, 1 node(s) had untolerated taint ...
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwo-intruder
+  namespace: am-demo
+spec:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels: { app: rwo-writer }
+  containers:
+    - name: intruder
+      image: busybox:1.36
+      command: ["sh", "-c", "echo 'I got in!' >> /data/log.txt; sleep 3600"]
+      volumeMounts:
+        - { name: data, mountPath: /data }
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: rwo-local-pvc

@@ -1,0 +1,33 @@
+# DEMO 4b — second pod, SAME node as writer-1
+# -------------------------------------------
+# With RWO this would work (demo 1a ran 3 pods on one node).
+# With RWOP it must not.
+#
+# podAffinity pins this pod next to rwop-writer-1, so the only reason it can
+# fail is the access mode.
+#
+# Expectation: Pending, event similar to
+#   0/3 nodes are available: 1 node has pod using PersistentVolumeClaim with
+#   the same name and ReadWriteOncePod access mode, ...
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwop-writer-2
+  namespace: am-demo
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels: { app: rwop }
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c", "echo \"$(date +%T) writer-2 got in\" >> /data/owner.log; sleep 3600"]
+      volumeMounts:
+        - { name: data, mountPath: /data }
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: rwop-pvc

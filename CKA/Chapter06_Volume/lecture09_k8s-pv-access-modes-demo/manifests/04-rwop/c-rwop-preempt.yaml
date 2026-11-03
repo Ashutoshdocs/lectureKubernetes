@@ -1,0 +1,42 @@
+# DEMO 4c (optional) — a higher-priority pod TAKES the RWOP volume
+# ----------------------------------------------------------------
+# The scheduler can preempt (evict) the current owner of an RWOP volume if a
+# more important pod needs it. Delete rwop-writer-2 before applying this.
+#
+# Expectation: rwop-writer-1 is terminated, rwop-vip becomes the only owner.
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: am-demo-high
+value: 1000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Demo: allowed to preempt the current RWOP owner"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwop-vip
+  namespace: am-demo
+spec:
+  priorityClassName: am-demo-high
+  containers:
+    - name: writer
+      image: busybox:1.36
+      env:
+        - name: NODE_NAME
+          valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          while true; do
+            echo "$(date +%T) VIP $HOSTNAME on $NODE_NAME owns the volume now" >> /data/owner.log
+            sleep 5
+          done
+      volumeMounts:
+        - { name: data, mountPath: /data }
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: rwop-pvc

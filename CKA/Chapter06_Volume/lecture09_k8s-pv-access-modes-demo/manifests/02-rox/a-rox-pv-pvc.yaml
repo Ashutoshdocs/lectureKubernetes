@@ -1,0 +1,41 @@
+# DEMO 2a — ReadOnlyMany: a PRE-POPULATED volume shared by many nodes
+# --------------------------------------------------------------------
+# Static provisioning: an admin already put content at
+#   NFS_SERVER_IP:/srv/nfs/static/website   (setup-nfs.sh did this)
+# and publishes it as a ROX PersistentVolume.
+#
+# NFS_SERVER_IP is replaced by sed at apply time (see README).
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rox-website-pv
+  labels: { demo: rox }
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes: [ReadOnlyMany]
+  persistentVolumeReclaimPolicy: Retain      # never delete the published content
+  storageClassName: ""                       # static PV, no provisioner
+  mountOptions: [nfsvers=4.1]
+  nfs:
+    server: NFS_SERVER_IP
+    path: /srv/nfs/static/website
+    # Uncomment the next line to force ro at the PV level (see Demo 2c in README)
+    # readOnly: true
+  claimRef:                                  # reserve this PV for exactly one PVC
+    namespace: am-demo
+    name: rox-website-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rox-website-pvc
+  namespace: am-demo
+spec:
+  accessModes: [ReadOnlyMany]
+  storageClassName: ""
+  volumeName: rox-website-pv
+  resources:
+    requests:
+      storage: 1Gi
