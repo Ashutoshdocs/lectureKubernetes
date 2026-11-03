@@ -1,4 +1,3 @@
-cat > 05-add-new-node.sh <<'SCRIPT_END'
 #!/bin/bash
 # =====================================================================
 # 05-add-new-node.sh   (HA VM after "az login", or laptop / Cloud Shell)  - fully via CLI
@@ -133,6 +132,3 @@ if [ "$ROLE" = "controlplane" ]; then
     echo "        server ${NAME} ${IP}:6443 check      then: sudo systemctl reload haproxy"
   fi
   echo "      Also add ${NAME}:${IP} to CP_NODES in cluster.env so the demo scripts see it."
-fi
-SCRIPT_END
-chmod +x 05-add-new-node.sh
