@@ -1,3 +1,4 @@
+cat > 05-add-new-node.sh <<'SCRIPT_END'
 #!/bin/bash
 # =====================================================================
 # 05-add-new-node.sh   (HA VM after "az login", or laptop / Cloud Shell)  - fully via CLI
@@ -22,33 +23,60 @@ IP="${2:-$NEW_NODE_IP}"
 ROLE="${3:-worker}"
 [[ "$ROLE" =~ ^(worker|controlplane)$ ]] || { echo "ROLE must be worker or controlplane"; exit 1; }
 
-if [ -z "${ADMIN_PASSWORD}" ]; then
-  read -rsp "Password for '${ADMIN_USER}' on ${NAME}: " ADMIN_PASSWORD; echo
+# sizes: workers 1 vCPU, control planes 2 vCPU (defaults if cluster.env is older)
+VM_SIZE="${VM_SIZE:-Standard_B2s}"
+WORKER_VM_SIZE="${WORKER_VM_SIZE:-Standard_B1ms}"
+if [ "$ROLE" = "controlplane" ]; then SIZE="${VM_SIZE}"; else SIZE="${WORKER_VM_SIZE}"; fi
+
+# ---- quota check (skipped if the VM already exists) ----
+if ! az vm show -g "${RG}" -n "${NAME}" -o none 2>/dev/null; then
+  NEED=$(az vm list-sizes -l "${LOCATION}" --query "[?name=='${SIZE}'].numberOfCores | [0]" -o tsv | tr -d '\r')
+  read -r USED LIMIT < <(az vm list-usage -l "${LOCATION}" \
+    --query "[?name.value=='cores'] | [0].[currentValue, limit]" -o tsv | tr -d '\r')
+  echo "=== vCPU quota ${LOCATION}: used ${USED}/${LIMIT}, ${NAME} (${SIZE}) needs ${NEED} ==="
+  if [ $((USED + NEED)) -gt "${LIMIT}" ]; then
+    echo "Not enough quota. Options:"
+    echo "  - free a worker:  az vm deallocate -g ${RG} -n vm-k8s-worker3"
+    echo "    ('stopped' VMs still use quota - they must be 'deallocated')"
+    echo "  - or request Total Regional vCPUs >= $((USED + NEED)) for ${LOCATION}"
+    echo "VM power states:"
+    az vm list -g "${RG}" -d --query "[].{VM:name, State:powerState, Size:hardwareProfile.vmSize}" -o table
+    exit 1
+  fi
 fi
 
 run_on() {   # $1=vm, $2=script file  -> prints stdout of the script
   az vm run-command invoke -g "${RG}" -n "$1" --command-id RunShellScript \
-    --scripts @"$2" --query "value[0].message" -o tsv
+    --scripts @"$2" --query "value[0].message" -o tsv | tr -d '\r'
 }
 
 # pick the first control plane that is running
 CP_VM=""
 for n in ${CP_NODES}; do
   st=$(az vm get-instance-view -g "${RG}" -n "${n%%:*}" \
-        --query "instanceView.statuses[?starts_with(code,'PowerState')].displayStatus" -o tsv)
+        --query "instanceView.statuses[?starts_with(code,'PowerState')].displayStatus" -o tsv | tr -d '\r')
   [ "$st" = "VM running" ] && { CP_VM="${n%%:*}"; break; }
 done
 [ -n "$CP_VM" ] || { echo "No running control plane found"; exit 1; }
 echo "=== Using ${CP_VM} to generate the join command ==="
 
-echo "=== 1/5 Creating VM ${NAME} (${IP}) ==="
-az vm create -g "${RG}" -n "${NAME}" \
-  --image "${VM_IMAGE}" --size "${VM_SIZE}" \
-  --admin-username "${ADMIN_USER}" --admin-password "${ADMIN_PASSWORD}" \
-  --authentication-type password \
-  --vnet-name "${VNET_NAME}" --subnet "${SUBNET_NAME}" \
-  --private-ip-address "${IP}" --public-ip-sku Standard --nsg "" \
-  --os-disk-size-gb 30 -o table
+if ! az vm show -g "${RG}" -n "${NAME}" -o none 2>/dev/null && [ -z "${ADMIN_PASSWORD}" ]; then
+  read -rsp "Password for '${ADMIN_USER}' on new VM ${NAME}: " ADMIN_PASSWORD; echo
+fi
+
+echo "=== 1/5 Creating VM ${NAME} (${IP}, ${SIZE}) ==="
+if az vm show -g "${RG}" -n "${NAME}" -o none 2>/dev/null; then
+  echo "    ${NAME} already exists - reusing it"
+  az vm start -g "${RG}" -n "${NAME}" -o none
+else
+  az vm create -g "${RG}" -n "${NAME}" \
+    --image "${VM_IMAGE}" --size "${SIZE}" \
+    --admin-username "${ADMIN_USER}" --admin-password "${ADMIN_PASSWORD}" \
+    --authentication-type password \
+    --vnet-name "${VNET_NAME}" --subnet "${SUBNET_NAME}" \
+    --private-ip-address "${IP}" --public-ip-sku Standard --nsg "" \
+    --os-disk-size-gb 30 --only-show-errors -o table
+fi
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -106,3 +134,5 @@ if [ "$ROLE" = "controlplane" ]; then
   fi
   echo "      Also add ${NAME}:${IP} to CP_NODES in cluster.env so the demo scripts see it."
 fi
+SCRIPT_END
+chmod +x 05-add-new-node.sh
