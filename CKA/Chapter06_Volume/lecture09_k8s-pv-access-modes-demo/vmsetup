@@ -1,0 +1,8 @@
+az group create --name rg-k8s-cluster --location centralindia
+
+az network vnet create --resource-group rg-k8s-cluster --name vnet-k8s --address-prefix 10.0.0.0/16 --subnet-name subnet-k8s --subnet-prefix 10.0.1.0/24
+
+
+az vm create --resource-group rg-k8s-cluster --name controlplanevm --location centralindia --image Ubuntu2404 --size Standard_B2s --vnet-name vnet-k8s --subnet subnet-k8s --admin-username azureuser --admin-password "K8sLab@2026Secure!" --authentication-type password --public-ip-sku Standard --nsg-rule SSH
+az vm create --resource-group rg-k8s-cluster --name worker01 --location centralindia --image Ubuntu2404 --size Standard_B1s --vnet-name vnet-k8s --subnet subnet-k8s --admin-username azureuser --admin-password "K8sLab@2026Secure!" --authentication-type password --public-ip-sku Standard --nsg-rule SSH
+az vm create --resource-group rg-k8s-cluster --name worker02 --location centralindia --image Ubuntu2404 --size Standard_B1s --vnet-name vnet-k8s --subnet subnet-k8s --admin-username azureuser --admin-password "K8sLab@2026Secure!" --authentication-type password --public-ip-sku Standard --nsg-rule SSH
