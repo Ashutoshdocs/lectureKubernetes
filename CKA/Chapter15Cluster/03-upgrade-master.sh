@@ -14,6 +14,15 @@ NEW_VERSION="${NEW_VERSION:-1.35}"     # <-- NEW version (minor only)
 export KUBECONFIG=/etc/kubernetes/admin.conf
 NODE=$(hostname)
 
+# --- Safety check: kubeadm upgrades only ONE minor version at a time
+CUR_MINOR=$(kubectl version -o json | grep -A5 serverVersion | grep -oP '"minor": "\K[0-9]+')
+NEW_MINOR=${NEW_VERSION#*.}
+if [ $((NEW_MINOR - CUR_MINOR)) -ne 1 ]; then
+  echo "ERROR: cluster is on 1.${CUR_MINOR}, NEW_VERSION=${NEW_VERSION}."
+  echo "kubeadm can only upgrade one minor at a time. Use NEW_VERSION=1.$((CUR_MINOR + 1))"
+  exit 1
+fi
+
 echo "=== BEFORE upgrade ==="
 kubectl get nodes -o wide
 kubeadm version -o short
@@ -32,7 +41,7 @@ echo "=== Target version: ${TARGET} (package ${PKG_VER}) ==="
 
 echo "=== Step 2: upgrade kubeadm ==="
 apt-mark unhold kubeadm
-apt-get install -y kubeadm="${PKG_VER}"
+apt-get install -y --allow-downgrades kubeadm="${PKG_VER}"
 apt-mark hold kubeadm
 kubeadm version -o short
 
@@ -47,7 +56,7 @@ kubectl drain "${NODE}" --ignore-daemonsets --delete-emptydir-data
 
 echo "=== Step 6: upgrade kubelet + kubectl ==="
 apt-mark unhold kubelet kubectl
-apt-get install -y kubelet="${PKG_VER}" kubectl="${PKG_VER}"
+apt-get install -y --allow-downgrades kubelet="${PKG_VER}" kubectl="${PKG_VER}"
 apt-mark hold kubelet kubectl
 systemctl daemon-reload
 systemctl restart kubelet

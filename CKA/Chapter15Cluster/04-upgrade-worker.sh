@@ -10,6 +10,15 @@ if [ "$(id -u)" -ne 0 ]; then echo "Run as root (sudo)"; exit 1; fi
 
 NEW_VERSION="${NEW_VERSION:-1.35}"
 
+# --- Safety check: kubeadm upgrades only ONE minor version at a time
+CUR_MINOR=$(kubelet --version | grep -oP 'v1\.\K[0-9]+')
+NEW_MINOR=${NEW_VERSION#*.}
+if [ $((NEW_MINOR - CUR_MINOR)) -ne 1 ]; then
+  echo "ERROR: this node is on 1.${CUR_MINOR}, NEW_VERSION=${NEW_VERSION}."
+  echo "Upgrade one minor at a time. Use NEW_VERSION=1.$((CUR_MINOR + 1))"
+  exit 1
+fi
+
 echo "=== Step 1: switch apt repo to v${NEW_VERSION} ==="
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v${NEW_VERSION}/deb/Release.key \
     | gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
@@ -22,7 +31,7 @@ echo "=== Target package: ${PKG_VER} ==="
 
 echo "=== Step 2: upgrade kubeadm ==="
 apt-mark unhold kubeadm
-apt-get install -y kubeadm="${PKG_VER}"
+apt-get install -y --allow-downgrades kubeadm="${PKG_VER}"
 apt-mark hold kubeadm
 
 echo "=== Step 3: kubeadm upgrade node (updates local kubelet config) ==="
@@ -30,7 +39,7 @@ kubeadm upgrade node
 
 echo "=== Step 4: upgrade kubelet + kubectl ==="
 apt-mark unhold kubelet kubectl
-apt-get install -y kubelet="${PKG_VER}" kubectl="${PKG_VER}"
+apt-get install -y --allow-downgrades kubelet="${PKG_VER}" kubectl="${PKG_VER}"
 apt-mark hold kubelet kubectl
 systemctl daemon-reload
 systemctl restart kubelet

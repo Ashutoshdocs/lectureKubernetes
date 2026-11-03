@@ -36,6 +36,7 @@ End-to-end practical on a **2-node kubeadm cluster** (1 master + 1 worker):
 | `02-demo-deployments.yaml` | master | 3 deployments: nginx, httpd, redis |
 | `03-upgrade-master.sh` | master | full control plane + kubelet upgrade |
 | `04-upgrade-worker.sh` | worker | worker upgrade |
+| `upgrade-helper.sh` | master + worker | **interactive**: shows versions, suggests next valid version, runs 03/04 for you |
 | `05-etcd-restore.sh` | master | restore snapshot, re-sync upgraded config |
 | `original_setup_reference/` | — | original both.sh / master_only.sh from Chapter00 |
 
@@ -121,7 +122,18 @@ These are **not** in the backup.
 
 ## PART 4 — Upgrade cluster (all components)
 
-### 4a. Master
+### Easiest way: interactive helper
+```bash
+sudo bash upgrade-helper.sh
+```
+- **On master** it shows the control plane, every node's kubelet, kubeadm, kubectl and etcd versions, checks which newer versions exist on pkgs.k8s.io, and prints the full path (e.g. `1.30 -> 1.31 -> ... -> 1.35`).
+- Menu: `1` upgrade control plane to the next version · `2` drain a worker and show what to run on it · `3` uncordon a worker · `4` refresh.
+- **On worker** it reads its kubelet + control plane version, suggests the next version for that worker, and runs `04-upgrade-worker.sh`.
+- It only allows the next minor (current + 1), so you can't skip versions by mistake. If kubeadm was already installed too new, it gets put back automatically.
+
+Loop per version: master `1` → master `2` → worker helper → master `3` → repeat.
+
+### 4a. Master (manual)
 ```bash
 sudo NEW_VERSION=1.35 bash 03-upgrade-master.sh
 ```
@@ -154,6 +166,17 @@ kubectl uncordon worker
 kubectl get nodes -o wide             # both v1.35.x
 kubectl get deploy -n upgrade-demo    # the 3 deployments survived the upgrade
 ```
+
+### Upgrading across several versions (e.g. 1.30 → 1.35)
+Repeat PART 4 (master, then worker) once per minor: **1.31 → 1.32 → 1.33 → 1.34 → 1.35**.
+```bash
+for each V in 1.31 1.32 1.33 1.34 1.35:
+  master: sudo NEW_VERSION=$V bash 03-upgrade-master.sh
+  master: kubectl drain <worker> --ignore-daemonsets --delete-emptydir-data
+  worker: sudo NEW_VERSION=$V bash 04-upgrade-worker.sh
+  master: kubectl uncordon <worker>
+```
+The scripts refuse to run if `NEW_VERSION` is not exactly current + 1.
 
 ---
 
