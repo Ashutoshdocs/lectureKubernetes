@@ -1,0 +1,65 @@
+# DEMO 3 - POD AFFINITY (topologyKey: kubernetes.io/hostname)
+# Step 1: "cache" (redis) runs 1 replica pinned to zone-b.
+# Step 2: "web" REQUIRES to run on the SAME NODE as a pod with app=cache.
+# Expected: all 3 web replicas land on the exact node where the cache pod is running.
+# Apply cache first, then web:
+#   kubectl apply -f 04-pod-affinity.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache
+  namespace: scheduling-demo
+  labels:
+    demo: pod-affinity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache
+  template:
+    metadata:
+      labels:
+        app: cache
+    spec:
+      nodeSelector:                       # simplest form of node selection
+        topology.kubernetes.io/zone: zone-b
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: scheduling-demo
+  labels:
+    demo: pod-affinity
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: cache
+              topologyKey: kubernetes.io/hostname   # "same node"
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

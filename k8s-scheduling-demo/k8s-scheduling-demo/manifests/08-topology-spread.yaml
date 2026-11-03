@@ -1,0 +1,43 @@
+# DEMO 5c (bonus) - topologySpreadConstraints over ZONE
+# The modern way to spread evenly. maxSkew: 1 = pod count difference between zones <= 1.
+# 6 replicas over 2 zones -> 3 in zone-a + 3 in zone-b (even though zone-a has more nodes).
+# Second constraint spreads within a zone across nodes (soft).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zone-spread
+  namespace: scheduling-demo
+  labels:
+    demo: zone-topology
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: zone-spread
+  template:
+    metadata:
+      labels:
+        app: zone-spread
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule     # hard
+          labelSelector:
+            matchLabels:
+              app: zone-spread
+          nodeAffinityPolicy: Honor
+          nodeTaintsPolicy: Honor              # ignore the tainted master when counting domains
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway    # soft
+          labelSelector:
+            matchLabels:
+              app: zone-spread
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

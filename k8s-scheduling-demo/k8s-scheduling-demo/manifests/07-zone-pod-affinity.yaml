@@ -1,0 +1,79 @@
+# DEMO 5b - topologyKey = ZONE with POD AFFINITY
+# "db" runs 1 replica pinned to zone-a (any zone-a node).
+# "api" REQUIRES to be in the SAME ZONE as db - but NOT necessarily the same node.
+# Compare with DEMO 3 (hostname): here api pods spread over worker-a1/a2/a3,
+# whereas with hostname they were all stuck on one node.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: scheduling-demo
+  labels:
+    demo: zone-topology
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-a
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: scheduling-demo
+  labels:
+    demo: zone-topology
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: db
+              topologyKey: topology.kubernetes.io/zone   # "same ZONE as db"
+        podAntiAffinity:                                   # bonus: spread api over zone-a nodes
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: api
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

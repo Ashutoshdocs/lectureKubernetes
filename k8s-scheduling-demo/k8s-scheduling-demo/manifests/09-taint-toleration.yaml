@@ -1,0 +1,94 @@
+# DEMO 6 - TAINTS & TOLERATIONS
+# Before applying, taint worker-b2:
+#   kubectl taint nodes worker-b2 dedicated=gpu:NoSchedule
+#
+# "no-toleration"   -> can NEVER land on worker-b2.
+# "gpu-tolerant"    -> tolerates the taint AND requires worker-b2 via node affinity
+#                      (toleration only ALLOWS, it does not ATTRACT - you need affinity for that).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: no-toleration
+  namespace: scheduling-demo
+  labels:
+    demo: taint
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: no-toleration
+  template:
+    metadata:
+      labels:
+        app: no-toleration
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-tolerant
+  namespace: scheduling-demo
+  labels:
+    demo: taint
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gpu-tolerant
+  template:
+    metadata:
+      labels:
+        app: gpu-tolerant
+    spec:
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: gpu
+          effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - worker-b2
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+---
+# Optional: a pod that even runs on the MASTER by tolerating the control-plane taint.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: on-master
+  namespace: scheduling-demo
+  labels:
+    demo: taint
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: nginx
+      image: nginx:1.27-alpine
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi

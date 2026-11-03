@@ -1,0 +1,37 @@
+# DEMO 4 - POD ANTI-AFFINITY (topologyKey: kubernetes.io/hostname)
+# HARD rule: no two "spread-per-node" pods on the same node.
+# We have 5 schedulable workers (master is tainted) and ask for 6 replicas.
+# Expected: 5 Running (one per worker) + 1 Pending with event:
+#   "0/6 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: },
+#    5 node(s) didn't match pod anti-affinity rules."
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spread-per-node
+  namespace: scheduling-demo
+  labels:
+    demo: pod-anti-affinity
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: spread-per-node
+  template:
+    metadata:
+      labels:
+        app: spread-per-node
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: spread-per-node
+              topologyKey: kubernetes.io/hostname   # "different node"
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

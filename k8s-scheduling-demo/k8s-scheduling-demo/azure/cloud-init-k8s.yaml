@@ -1,0 +1,60 @@
+#cloud-config
+# Prepares an Ubuntu 22.04 VM to become a kubeadm node (control plane or worker).
+# Installs: containerd (SystemdCgroup), kubeadm, kubelet, kubectl (pinned minor version).
+# Progress log on the VM:  sudo tail -f /var/log/cloud-init-output.log
+# Wait for completion:     cloud-init status --wait
+
+package_update: true
+package_upgrade: false
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gpg
+  - jq
+  - containerd
+
+write_files:
+  - path: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+  - path: /etc/sysctl.d/99-kubernetes.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+  - path: /etc/hosts.k8s
+    content: |
+      10.10.1.10 k8s-master
+      10.10.1.11 worker-a1
+      10.10.1.12 worker-a2
+      10.10.1.13 worker-a3
+      10.10.1.21 worker-b1
+      10.10.1.22 worker-b2
+
+runcmd:
+  # --- swap off (Azure Ubuntu images normally have none, this is a safety net)
+  - swapoff -a
+  - sed -i '/ swap / s/^/#/' /etc/fstab
+  # --- name resolution between nodes
+  - cat /etc/hosts.k8s >> /etc/hosts
+  # --- kernel modules + sysctl
+  - modprobe overlay
+  - modprobe br_netfilter
+  - sysctl --system
+  # --- containerd with systemd cgroup driver
+  - mkdir -p /etc/containerd
+  - containerd config default > /etc/containerd/config.toml
+  - sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+  - systemctl restart containerd
+  - systemctl enable containerd
+  # --- Kubernetes apt repo (change v1.34 to the minor version you want)
+  - mkdir -p /etc/apt/keyrings
+  - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+  - apt-get update
+  - apt-get install -y kubelet kubeadm kubectl
+  - apt-mark hold kubelet kubeadm kubectl
+  - systemctl enable kubelet
+  - echo "K8S NODE PREP COMPLETE" > /var/log/k8s-prep-done

@@ -1,0 +1,7 @@
+# All demo objects live in this namespace -> "kubectl delete ns scheduling-demo" cleans everything.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scheduling-demo
+  labels:
+    purpose: scheduling-demo

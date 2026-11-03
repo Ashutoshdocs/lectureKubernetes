@@ -1,0 +1,55 @@
+# DEMO 6b - NoExecute taint + tolerationSeconds
+# All 3 pods are pinned to worker-a3.
+#   evict-now     : no toleration         -> evicted immediately when NoExecute taint is added
+#   evict-after-60: tolerates for 60s     -> stays 60 seconds, then evicted
+#   stay-forever  : tolerates, no seconds -> never evicted
+# Then: kubectl taint nodes worker-a3 maintenance=true:NoExecute
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: evict-now
+  namespace: scheduling-demo
+  labels: {demo: noexecute}
+spec:
+  nodeSelector: {kubernetes.io/hostname: worker-a3}
+  containers:
+    - name: c
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 36000"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: evict-after-60
+  namespace: scheduling-demo
+  labels: {demo: noexecute}
+spec:
+  nodeSelector: {kubernetes.io/hostname: worker-a3}
+  tolerations:
+    - key: maintenance
+      operator: Equal
+      value: "true"
+      effect: NoExecute
+      tolerationSeconds: 60
+  containers:
+    - name: c
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 36000"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stay-forever
+  namespace: scheduling-demo
+  labels: {demo: noexecute}
+spec:
+  nodeSelector: {kubernetes.io/hostname: worker-a3}
+  tolerations:
+    - key: maintenance
+      operator: Exists
+      effect: NoExecute
+  containers:
+    - name: c
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 36000"]

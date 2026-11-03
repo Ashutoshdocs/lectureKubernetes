@@ -1,0 +1,73 @@
+# DEMO 5a - topologyKey = ZONE with POD ANTI-AFFINITY
+# HARD rule: at most ONE "zone-ha" pod per ZONE (not per node!).
+# topologyKey: topology.kubernetes.io/zone groups worker-a1/a2/a3 into one domain
+# and worker-b1/b2 into another. We have 2 zones -> only 2 pods can run.
+# Expected: 1 pod in zone-a, 1 pod in zone-b, 3rd replica Pending.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zone-ha-required
+  namespace: scheduling-demo
+  labels:
+    demo: zone-topology
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zone-ha-required
+  template:
+    metadata:
+      labels:
+        app: zone-ha-required
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: zone-ha-required
+              topologyKey: topology.kubernetes.io/zone   # "different ZONE"
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+---
+# SOFT version: prefer different zones, but allow more pods than zones.
+# Expected with 4 replicas: both zones used (2 + 2 or 3 + 1), nothing Pending.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zone-ha-preferred
+  namespace: scheduling-demo
+  labels:
+    demo: zone-topology
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: zone-ha-preferred
+  template:
+    metadata:
+      labels:
+        app: zone-ha-preferred
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: zone-ha-preferred
+                topologyKey: topology.kubernetes.io/zone
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

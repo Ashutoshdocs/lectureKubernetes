@@ -1,0 +1,37 @@
+# DEMO 1a - NODE AFFINITY (HARD / required)
+# Pods MUST land on a node labelled topology.kubernetes.io/zone=zone-a
+# Expected: all 4 replicas on worker-a1 / worker-a2 / worker-a3 only. Never on zone-b.
+# If no node matches -> pods stay Pending (try: remove the zone label from all zone-a nodes).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: na-required-zone-a
+  namespace: scheduling-demo
+  labels:
+    demo: node-affinity
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: na-required-zone-a
+  template:
+    metadata:
+      labels:
+        app: na-required-zone-a
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-a
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

@@ -1,0 +1,44 @@
+# DEMO 2 - NODE ANTI-AFFINITY
+# Kubernetes has no "nodeAntiAffinity" field. Node anti-affinity = nodeAffinity with
+# NotIn / DoesNotExist operators ("keep me AWAY from these nodes").
+# Rule here: never schedule on zone-a, and never on a node labelled env=maintenance.
+# Expected: all 3 replicas on worker-b1 / worker-b2 only.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-anti-affinity
+  namespace: scheduling-demo
+  labels:
+    demo: node-anti-affinity
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: node-anti-affinity
+  template:
+    metadata:
+      labels:
+        app: node-anti-affinity
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:          # all expressions in ONE term are ANDed
+                  - key: topology.kubernetes.io/zone
+                    operator: NotIn
+                    values:
+                      - zone-a
+                  - key: env
+                    operator: NotIn        # NotIn also matches nodes WITHOUT the label
+                    values:
+                      - maintenance
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist # explicitly avoid the master
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi

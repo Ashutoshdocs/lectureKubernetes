@@ -1,0 +1,78 @@
+# 02-demo-deployments.yaml
+# 3 deployments created AFTER the etcd backup.
+# After restoring the backup at the end, these should DISAPPEAR
+# (proof that the restore worked).
+#   kubectl apply -f 02-demo-deployments.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: upgrade-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-nginx
+  namespace: upgrade-demo
+  labels:
+    app: web-nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-nginx
+  template:
+    metadata:
+      labels:
+        app: web-nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-httpd
+  namespace: upgrade-demo
+  labels:
+    app: web-httpd
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-httpd
+  template:
+    metadata:
+      labels:
+        app: web-httpd
+    spec:
+      containers:
+        - name: httpd
+          image: httpd:2.4
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-redis
+  namespace: upgrade-demo
+  labels:
+    app: cache-redis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cache-redis
+  template:
+    metadata:
+      labels:
+        app: cache-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          ports:
+            - containerPort: 6379

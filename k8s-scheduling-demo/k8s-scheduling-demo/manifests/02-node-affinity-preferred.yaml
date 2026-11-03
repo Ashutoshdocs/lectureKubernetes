@@ -1,0 +1,46 @@
+# DEMO 1b - NODE AFFINITY (SOFT / preferred)
+# Scheduler PREFERS nodes with disktype=ssd (weight 80) and zone-b (weight 20),
+# but will still place pods elsewhere if the preferred nodes are full / unavailable.
+# Expected: most replicas on worker-b1 (ssd + zone-b) and worker-a1 (ssd).
+# Prove it is "soft": cordon worker-a1 and worker-b1, scale up -> pods still run on other nodes.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: na-preferred-ssd
+  namespace: scheduling-demo
+  labels:
+    demo: node-affinity
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: na-preferred-ssd
+  template:
+    metadata:
+      labels:
+        app: na-preferred-ssd
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 80
+              preference:
+                matchExpressions:
+                  - key: disktype
+                    operator: In
+                    values:
+                      - ssd
+            - weight: 20
+              preference:
+                matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - zone-b
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
