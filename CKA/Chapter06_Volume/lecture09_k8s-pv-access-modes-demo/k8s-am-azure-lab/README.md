@@ -1335,6 +1335,7 @@ Azure Files  → RWX / ROX (SMB or NFS)
 | `bad option ... need a /sbin/mount.nfs helper` | `nfs-common` missing on worker | `sudo apt install -y nfs-common` |
 | Pod stuck `ContainerCreating` on NFS | TCP 2049 blocked / NFS down | `nc -zv 10.0.1.4 2049` from the worker |
 | RWOP PV `driver not found` | CSI driver not installed | `bash scripts/02-install-nfs-csi-driver.sh` |
+| 2 of 4 replicas `Pending`, `didn't match pod topology spread constraints` | spread counts the tainted control plane as a 3rd node with 0 pods | `nodeTaintsPolicy: Honor` in the constraint (already in the manifests) |
 | Nodes `NotReady` | Calico not running | `kubectl -n kube-system get pods -l k8s-app=calico-node` |
 | Pods can't reach each other across nodes | Calico not in VXLAN mode | `kubectl get ippools -o yaml` → `vxlanMode: Always` |
 | cloud-init didn't finish | apt or network issue | `sudo cat /var/log/lab-setup.log` |

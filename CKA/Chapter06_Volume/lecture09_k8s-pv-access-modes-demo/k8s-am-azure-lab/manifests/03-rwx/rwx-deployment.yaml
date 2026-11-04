@@ -18,6 +18,7 @@ spec:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor        # ignore the tainted control-plane node when counting
           labelSelector:
             matchLabels:
               app: rwx-writer
