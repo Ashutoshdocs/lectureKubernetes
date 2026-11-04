@@ -1,0 +1,33 @@
+# Same as rox-pv-pvc.yaml, but read-only is ENFORCED at the PV level
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rox-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.1.4
+    path: /srv/nfs/k8s/rox
+    readOnly: true                # <- every pod gets a ro mount, no matter what it asks
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rox-pvc
+  namespace: access-modes
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: nfs-static
+  volumeName: rox-pv
+  resources:
+    requests:
+      storage: 1Gi

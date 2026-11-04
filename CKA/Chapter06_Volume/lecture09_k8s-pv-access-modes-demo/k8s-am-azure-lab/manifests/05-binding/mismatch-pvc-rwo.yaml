@@ -1,0 +1,13 @@
+# Asks for ReadWriteOnce -> matches the PV -> Bound
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: binding-demo-pvc
+  namespace: access-modes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: binding-demo
+  resources:
+    requests:
+      storage: 1Gi

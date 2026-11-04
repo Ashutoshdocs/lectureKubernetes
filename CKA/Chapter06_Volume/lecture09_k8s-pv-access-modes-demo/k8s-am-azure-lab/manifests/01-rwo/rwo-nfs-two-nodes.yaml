@@ -1,0 +1,41 @@
+# Two pods on TWO DIFFERENT nodes using the same RWO NFS claim
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwo-nfs-worker1
+  namespace: access-modes
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: k8s-worker-1
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c", "while true; do echo \"$(date +%T) from k8s-worker-1\" >> /data/log.txt; sleep 5; done"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: rwo-nfs-pvc
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwo-nfs-worker2
+  namespace: access-modes
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: k8s-worker-2
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command: ["sh", "-c", "while true; do echo \"$(date +%T) from k8s-worker-2\" >> /data/log.txt; sleep 5; done"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: rwo-nfs-pvc

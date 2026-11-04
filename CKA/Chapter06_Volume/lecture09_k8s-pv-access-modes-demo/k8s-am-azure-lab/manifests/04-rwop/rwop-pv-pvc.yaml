@@ -1,0 +1,35 @@
+# ReadWriteOncePod needs a CSI volume -> static PV using the NFS CSI driver
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rwop-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOncePod            # must be the ONLY access mode
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-csi-static
+  mountOptions:
+    - nfsvers=4.1
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeHandle: lab-rwop-volume # any string, unique in the cluster
+    volumeAttributes:
+      server: 10.0.1.4
+      share: /srv/nfs/k8s/rwop
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rwop-pvc
+  namespace: access-modes
+spec:
+  accessModes:
+    - ReadWriteOncePod
+  storageClassName: nfs-csi-static
+  volumeName: rwop-pv
+  resources:
+    requests:
+      storage: 1Gi

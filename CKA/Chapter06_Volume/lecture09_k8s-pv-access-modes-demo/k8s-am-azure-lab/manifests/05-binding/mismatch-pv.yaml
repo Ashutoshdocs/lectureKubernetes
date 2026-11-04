@@ -1,0 +1,15 @@
+# A PV that only offers ReadWriteOnce
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: binding-demo-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: binding-demo
+  nfs:
+    server: 10.0.1.4
+    path: /srv/nfs/k8s/rwx

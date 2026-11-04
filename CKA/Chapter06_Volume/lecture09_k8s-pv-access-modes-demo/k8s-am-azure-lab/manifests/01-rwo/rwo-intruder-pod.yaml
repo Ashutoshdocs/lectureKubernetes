@@ -1,0 +1,20 @@
+# Try to use the RWO local volume from k8s-worker-2 -> must stay Pending
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwo-intruder
+  namespace: access-modes
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: k8s-worker-2
+  containers:
+    - name: intruder
+      image: busybox:1.36
+      command: ["sh", "-c", "echo 'intruder got in' >> /data/log.txt; sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: rwo-local-pvc

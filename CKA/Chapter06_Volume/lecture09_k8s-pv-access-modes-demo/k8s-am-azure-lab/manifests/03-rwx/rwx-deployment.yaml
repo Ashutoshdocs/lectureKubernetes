@@ -1,45 +1,34 @@
-# DEMO 3 — ReadWriteMany: every pod on every node reads AND writes
-# ----------------------------------------------------------------
-# Dynamically provisioned by csi-driver-nfs (StorageClass nfs-csi): a new
-# sub-directory /srv/nfs/kubedata/pvc-<uid> is created on the NFS server.
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: rwx-pvc
-  namespace: am-demo
-spec:
-  accessModes: [ReadWriteMany]
-  storageClassName: nfs-csi
-  resources:
-    requests:
-      storage: 1Gi
----
+# 4 writers on 2 nodes, all appending to the SAME file
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rwx-writer
-  namespace: am-demo
+  namespace: access-modes
 spec:
   replicas: 4
   selector:
-    matchLabels: { app: rwx-writer }
+    matchLabels:
+      app: rwx-writer
   template:
     metadata:
-      labels: { app: rwx-writer }
+      labels:
+        app: rwx-writer
     spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
           labelSelector:
-            matchLabels: { app: rwx-writer }
+            matchLabels:
+              app: rwx-writer
       containers:
         - name: writer
           image: busybox:1.36
           env:
             - name: NODE_NAME
-              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -48,7 +37,8 @@ spec:
                 sleep 3
               done
           volumeMounts:
-            - { name: shared, mountPath: /shared }
+            - name: shared
+              mountPath: /shared
       volumes:
         - name: shared
           persistentVolumeClaim:

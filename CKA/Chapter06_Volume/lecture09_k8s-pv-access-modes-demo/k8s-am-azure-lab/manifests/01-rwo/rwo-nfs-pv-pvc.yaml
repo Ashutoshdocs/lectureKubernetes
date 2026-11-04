@@ -1,0 +1,32 @@
+# THE GOTCHA: an RWO volume on NFS
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rwo-nfs-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-static
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: 10.0.1.4
+    path: /srv/nfs/k8s/rwo
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rwo-nfs-pvc
+  namespace: access-modes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nfs-static
+  volumeName: rwo-nfs-pv          # bind to exactly this PV
+  resources:
+    requests:
+      storage: 1Gi

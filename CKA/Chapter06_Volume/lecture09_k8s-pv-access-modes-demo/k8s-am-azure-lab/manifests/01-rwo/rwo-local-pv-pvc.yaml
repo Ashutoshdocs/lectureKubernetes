@@ -1,0 +1,44 @@
+# RWO with a NODE-LOCAL disk (stands in for Azure Disk / EBS / GCE PD)
+# The data lives in /mnt/disks/rwo on k8s-worker-1 ONLY.
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-static
+provisioner: kubernetes.io/no-provisioner      # static PVs only
+volumeBindingMode: WaitForFirstConsumer        # bind when a pod is scheduled
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rwo-local-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-static
+  local:
+    path: /mnt/disks/rwo
+  nodeAffinity:                                # <- the volume is physically on worker-1
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-worker-1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rwo-local-pvc
+  namespace: access-modes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-static
+  resources:
+    requests:
+      storage: 1Gi
